@@ -92,6 +92,8 @@ Route::prefix('v1')->group(function () {
         Route::get('/transfers', [AssetTransferController::class, 'index'])->middleware('permission:transfers.view');
         Route::post('/transfers', [AssetTransferController::class, 'store'])->middleware('permission:transfers.create');
         Route::get('/transfers/{assetTransfer}', [AssetTransferController::class, 'show'])->middleware('permission:transfers.view');
+        Route::put('/transfers/{assetTransfer}', [AssetTransferController::class, 'update'])->middleware('permission:transfers.update');
+        Route::delete('/transfers/{assetTransfer}', [AssetTransferController::class, 'destroy'])->middleware('permission:transfers.delete');
 
         // Asset Damage Report (Barang Rusak) history
         Route::get('/damages', [AssetDamageController::class, 'index'])->middleware('permission:damages.view');

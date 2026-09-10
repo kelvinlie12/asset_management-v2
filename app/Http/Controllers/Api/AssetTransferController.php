@@ -106,4 +106,96 @@ class AssetTransferController extends Controller
             ),
         ]);
     }
+
+public function update(Request $request, AssetTransfer $assetTransfer): JsonResponse
+{
+    $validated = $request->validate([
+        'asset_id' => ['required', 'integer', 'exists:assets,id'],
+        'transfer_date' => ['required', 'date'],
+        'to_team_id' => ['nullable', 'integer', 'exists:teams,id'],
+        'to_room_id' => ['nullable', 'integer', 'exists:rooms,id'],
+        'to_user_id' => ['nullable', 'integer', 'exists:users,id'],
+        'reason' => ['nullable', 'string', 'max:1000'],
+    ]);
+ 
+    $asset = Asset::query()->findOrFail($validated['asset_id']);
+ 
+    if ($asset->condition === Asset::CONDITION_DAMAGED
+        && (($validated['to_user_id'] ?? null) || ($validated['to_team_id'] ?? null))) {
+        throw ValidationException::withMessages([
+            'asset_id' => 'A damaged asset cannot be transferred to a team or a user. Only storage room moves are allowed.',
+        ]);
+    }
+ 
+    $assetTransfer = DB::transaction(function () use ($validated, $asset, $assetTransfer) {
+        $isLatestForAsset = AssetTransfer::query()
+            ->where('asset_id', $assetTransfer->asset_id)
+            ->where(function ($q) use ($assetTransfer) {
+                $q->where('id', '>', $assetTransfer->id)
+                    ->orWhere(function ($q2) use ($assetTransfer) {
+                        $q2->where('id', $assetTransfer->id);
+                    });
+            })
+            ->where('id', '!=', $assetTransfer->id)
+            ->doesntExist();
+ 
+        $assetTransfer->update([
+            'asset_id' => $asset->id,
+            'transfer_date' => $validated['transfer_date'],
+            'to_team_id' => $validated['to_team_id'] ?? null,
+            'to_room_id' => $validated['to_room_id'] ?? null,
+            'to_user_id' => $validated['to_user_id'] ?? null,
+            'reason' => $validated['reason'] ?? null,
+        ]);
+ 
+        if ($isLatestForAsset) {
+            $asset->update([
+                'team_id' => $validated['to_team_id'] ?? null,
+                'room_id' => $validated['to_room_id'] ?? null,
+                'assigned_user_id' => $validated['to_user_id'] ?? null,
+            ]);
+        }
+ 
+        return $assetTransfer;
+    });
+ 
+    return ApiResponse::success([
+        'transfer' => new AssetTransferResource(
+            $assetTransfer->load(['asset.room', 'asset.category', 'fromTeam', 'toTeam', 'fromRoom', 'toRoom', 'fromUser', 'toUser', 'performedBy'])
+        ),
+    ], 'Transfer updated successfully.');
+}
+ 
+/**
+ * Delete a transfer record.
+ *
+ * If this was the most recent transfer for its asset, the asset's current
+ * placement is rolled back to this transfer's "from" values (the state
+ * before this transfer happened).
+ */
+public function destroy(AssetTransfer $assetTransfer): JsonResponse
+{
+    DB::transaction(function () use ($assetTransfer) {
+        $isLatestForAsset = AssetTransfer::query()
+            ->where('asset_id', $assetTransfer->asset_id)
+            ->where('id', '>', $assetTransfer->id)
+            ->doesntExist();
+ 
+        if ($isLatestForAsset) {
+            $asset = Asset::query()->find($assetTransfer->asset_id);
+            if ($asset) {
+                $asset->update([
+                    'team_id' => $assetTransfer->from_team_id,
+                    'room_id' => $assetTransfer->from_room_id,
+                    'assigned_user_id' => $assetTransfer->from_user_id,
+                ]);
+            }
+        }
+ 
+        $assetTransfer->delete();
+    });
+ 
+    return ApiResponse::success(null, 'Transfer deleted successfully.');
+}
+
 }
