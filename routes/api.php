@@ -1,20 +1,23 @@
 <?php
 
-use App\Http\Controllers\Api\AuthController;
-use App\Http\Controllers\Api\DashboardController;
-use App\Http\Controllers\Api\AssetController;
 use App\Http\Controllers\Api\AssetAssignmentController;
-use App\Http\Controllers\Api\AssetTransferController;
+use App\Http\Controllers\Api\AssetController;
 use App\Http\Controllers\Api\AssetDamageController;
-use App\Http\Controllers\Api\VehicleController;
-use App\Http\Controllers\Api\VehicleTaxReminderController;
-use App\Http\Controllers\Api\PurchaseController;
+use App\Http\Controllers\Api\AssetTransferController;
+use App\Http\Controllers\Api\AuditLogController;
+use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CategoryController;
+use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\PermissionController;
+use App\Http\Controllers\Api\PurchaseController;
 use App\Http\Controllers\Api\RoleController;
 use App\Http\Controllers\Api\RoomController;
+use App\Http\Controllers\Api\SupplierController;
 use App\Http\Controllers\Api\TeamController;
 use App\Http\Controllers\Api\UserController;
+use App\Http\Controllers\Api\VehicleController;
+use App\Http\Controllers\Api\VehicleTaxController;
+use App\Http\Controllers\Api\VehicleTaxReminderController;
 use App\Support\ApiResponse;
 use Illuminate\Support\Facades\Route;
 
@@ -24,7 +27,7 @@ Route::name('login')->get('/login', function () {
 
 Route::prefix('v1')->group(function () {
     Route::post('/auth/login', [AuthController::class, 'login'])
-            ->middleware('throttle:5,1');
+        ->middleware('throttle:5,1');
 
     Route::middleware('auth:sanctum')->group(function () {
         Route::post('/auth/logout', [AuthController::class, 'logout']);
@@ -109,6 +112,20 @@ Route::prefix('v1')->group(function () {
         Route::put('/vehicles/{vehicle}', [VehicleController::class, 'update'])->middleware('permission:vehicles.update');
         Route::delete('/vehicles/{vehicle}', [VehicleController::class, 'destroy'])->middleware('permission:vehicles.delete');
 
+        // Vehicle Tax (pajak kendaraan) management
+        Route::get('/vehicles/{vehicle}/taxes', [VehicleTaxController::class, 'index'])->middleware('permission:vehicle_taxes.view');
+        Route::post('/vehicles/{vehicle}/taxes', [VehicleTaxController::class, 'store'])->middleware('permission:vehicle_taxes.create');
+        Route::get('/vehicles/{vehicle}/taxes/{vehicleTax}', [VehicleTaxController::class, 'show'])->middleware('permission:vehicle_taxes.view');
+        Route::put('/vehicles/{vehicle}/taxes/{vehicleTax}', [VehicleTaxController::class, 'update'])->middleware('permission:vehicle_taxes.update');
+        Route::delete('/vehicles/{vehicle}/taxes/{vehicleTax}', [VehicleTaxController::class, 'destroy'])->middleware('permission:vehicle_taxes.delete');
+
+        // Supplier / Vendor master data
+        Route::get('/suppliers', [SupplierController::class, 'index'])->middleware('permission:suppliers.view');
+        Route::post('/suppliers', [SupplierController::class, 'store'])->middleware('permission:suppliers.create');
+        Route::get('/suppliers/{supplier}', [SupplierController::class, 'show'])->middleware('permission:suppliers.view');
+        Route::put('/suppliers/{supplier}', [SupplierController::class, 'update'])->middleware('permission:suppliers.update');
+        Route::delete('/suppliers/{supplier}', [SupplierController::class, 'destroy'])->middleware('permission:suppliers.delete');
+
         // Vehicle Tax Reminder
         Route::get('/vehicle-tax-reminders', [VehicleTaxReminderController::class, 'index'])->middleware('permission:vehicles.view');
 
@@ -129,5 +146,9 @@ Route::prefix('v1')->group(function () {
 
         // Dashboard
         Route::get('/dashboard', [DashboardController::class, 'show'])->middleware('permission:assets.view');
+
+        // Audit log (Log Aktivitas)
+        Route::get('/audit-logs', [AuditLogController::class, 'index'])->middleware('permission:audit_logs.view');
+        Route::get('/audit-logs/{auditLog}', [AuditLogController::class, 'show'])->middleware('permission:audit_logs.view');
     });
 });

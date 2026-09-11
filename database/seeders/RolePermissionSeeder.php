@@ -6,6 +6,7 @@ use App\Models\User;
 use Illuminate\Database\Seeder;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
+use Spatie\Permission\PermissionRegistrar;
 
 class RolePermissionSeeder extends Seeder
 {
@@ -75,6 +76,18 @@ class RolePermissionSeeder extends Seeder
         'vehicles.create',
         'vehicles.update',
         'vehicles.delete',
+        // Vehicle Tax (Pajak Kendaraan)
+        'vehicle_taxes.view',
+        'vehicle_taxes.create',
+        'vehicle_taxes.update',
+        'vehicle_taxes.delete',
+        // Supplier / Vendor
+        'suppliers.view',
+        'suppliers.create',
+        'suppliers.update',
+        'suppliers.delete',
+        // Audit log (Log Aktivitas)
+        'audit_logs.view',
     ];
 
     /**
@@ -136,14 +149,28 @@ class RolePermissionSeeder extends Seeder
             'vehicles.create',
             'vehicles.update',
             'vehicles.delete',
+            'vehicle_taxes.view',
+            'vehicle_taxes.create',
+            'vehicle_taxes.update',
+            'vehicle_taxes.delete',
+            'suppliers.view',
+            'suppliers.create',
+            'suppliers.update',
+            'suppliers.delete',
+            'audit_logs.view',
         ],
         User::ROLE_SUPER_ADMIN => self::PERMISSIONS,
     ];
 
     public function run(): void
     {
+        // Use firstOrCreate (bypasses the Spatie registrar cache) so the seeder
+        // stays idempotent even when the cached permission snapshot is stale.
         $permissionModels = collect(self::PERMISSIONS)->mapWithKeys(
-            fn (string $name) => [$name => Permission::findOrCreate($name, self::GUARD)]
+            fn (string $name) => [$name => Permission::firstOrCreate(
+                ['name' => $name, 'guard_name' => self::GUARD],
+                ['name' => $name, 'guard_name' => self::GUARD],
+            )]
         );
 
         foreach (self::ROLE_PERMISSIONS as $roleName => $rolePermissionNames) {
@@ -157,5 +184,8 @@ class RolePermissionSeeder extends Seeder
         User::query()->each(function (User $user) {
             $user->syncRoleToSpatie();
         });
+
+        // Drop the cached snapshot so subsequent lookups see the current rows.
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
     }
 }

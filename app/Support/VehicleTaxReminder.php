@@ -6,12 +6,18 @@ use App\Models\VehicleAsset;
 use Carbon\Carbon;
 
 /**
- * Computes vehicle tax reminder categories based on each vehicle's tax due date.
+ * Computes vehicle tax reminder categories based on each vehicle's current
+ * unpaid tax due date.
  *
  * Buckets are cumulative:
- *  - due_soon_7:  tax due within the next 7 days (inclusive of today)
- *  - due_soon_14: tax due within the next 14 days
- *  - due_soon_30: tax due within the next 30 days
+ *  - overdue:        tax due date passed
+ *  - due_today:      due today (unpaid)
+ *  - due_soon_7:     due within the next 7 days (inclusive of today)
+ *  - due_soon_14:    due within the next 14 days
+ *  - due_soon_30:    due within the next 30 days
+ *
+ * Vehicles whose tax_status is PAID are excluded from the "needs attention"
+ * lists.
  */
 class VehicleTaxReminder
 {
@@ -25,7 +31,7 @@ class VehicleTaxReminder
         $today = Carbon::today();
 
         $vehicles = VehicleAsset::query()
-            ->with(['team', 'room', 'assignedUser'])
+            ->with(['team', 'room', 'assignedUser', 'supplier'])
             ->get();
 
         $summary = [
@@ -39,7 +45,11 @@ class VehicleTaxReminder
         ];
 
         $attention = $vehicles->filter(function (VehicleAsset $vehicle) use ($today, &$summary) {
-            $due = $vehicle->tax_due_date ? Carbon::parse($vehicle->tax_due_date) : null;
+            if ($vehicle->tax_status === VehicleAsset::TAX_PAID) {
+                return false;
+            }
+
+            $due = $vehicle->effectiveTaxDueDate();
             if (! $due) {
                 return false;
             }

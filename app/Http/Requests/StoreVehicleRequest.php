@@ -29,18 +29,22 @@ class StoreVehicleRequest extends FormRequest
             'photo' => ['nullable', 'string', 'max:255'],
             'brand' => ['required', 'string', 'max:255'],
             'model' => ['required', 'string', 'max:255'],
+            'year' => ['nullable', 'string', 'max:4', 'regex:/^\d{4}$/'],
             'plate_number' => ['required', 'string', 'max:20', 'regex:/^[A-Z]{1,2}[ ]?\d{1,4}[ ]?[A-Z]{1,3}$/', 'unique:vehicle_assets,plate_number'],
             'engine_number' => ['nullable', 'string', 'max:255'],
             'chassis_number' => ['nullable', 'string', 'max:255'],
             'purchase_date' => ['nullable', 'date'],
             'purchase_price' => ['nullable', 'numeric', 'min:0'],
+            'last_tax_amount' => ['nullable', 'numeric', 'min:0'],
             'tax_due_date' => ['nullable', 'date'],
+            'tax_status' => ['nullable', Rule::in(VehicleAsset::TAX_STATUSES)],
             'description' => ['nullable', 'string'],
             'condition' => ['required', Rule::in(VehicleAsset::CONDITIONS)],
             'usage_status' => ['required', Rule::in(VehicleAsset::USAGE_STATUSES)],
             'team_id' => ['nullable', Rule::exists('teams', 'id')],
             'room_id' => ['nullable', Rule::exists('rooms', 'id')],
             'assigned_user_id' => ['nullable', Rule::exists('users', 'id')],
+            'supplier_id' => ['nullable', Rule::exists('suppliers', 'id')],
         ];
     }
 

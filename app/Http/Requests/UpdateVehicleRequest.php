@@ -31,18 +31,22 @@ class UpdateVehicleRequest extends FormRequest
             'photo' => ['sometimes', 'nullable', 'string', 'max:255'],
             'brand' => ['sometimes', 'string', 'max:255'],
             'model' => ['sometimes', 'string', 'max:255'],
+            'year' => ['sometimes', 'nullable', 'string', 'max:4', 'regex:/^\d{4}$/'],
             'plate_number' => ['sometimes', 'string', 'max:20', 'regex:/^[A-Z]{1,2}[ ]?\d{1,4}[ ]?[A-Z]{1,3}$/', 'unique:vehicle_assets,plate_number,'.$vehicle->id],
             'engine_number' => ['sometimes', 'nullable', 'string', 'max:255'],
             'chassis_number' => ['sometimes', 'nullable', 'string', 'max:255'],
             'purchase_date' => ['sometimes', 'nullable', 'date'],
             'purchase_price' => ['sometimes', 'nullable', 'numeric', 'min:0'],
+            'last_tax_amount' => ['sometimes', 'nullable', 'numeric', 'min:0'],
             'tax_due_date' => ['sometimes', 'nullable', 'date'],
+            'tax_status' => ['sometimes', Rule::in(VehicleAsset::TAX_STATUSES)],
             'description' => ['sometimes', 'nullable', 'string'],
             'condition' => ['sometimes', Rule::in(VehicleAsset::CONDITIONS)],
             'usage_status' => ['sometimes', Rule::in(VehicleAsset::USAGE_STATUSES)],
             'team_id' => ['sometimes', 'nullable', Rule::exists('teams', 'id')],
             'room_id' => ['sometimes', 'nullable', Rule::exists('rooms', 'id')],
             'assigned_user_id' => ['sometimes', 'nullable', Rule::exists('users', 'id')],
+            'supplier_id' => ['sometimes', 'nullable', Rule::exists('suppliers', 'id')],
         ];
     }
 

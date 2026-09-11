@@ -22,7 +22,7 @@ class VehicleController extends Controller
         $perPage = min(max($perPage, 1), 100);
 
         $vehicles = VehicleAsset::query()
-            ->with(['team', 'room', 'assignedUser'])
+            ->with(['team', 'room', 'assignedUser', 'supplier'])
             ->when($request->query('search'), function ($query, $search) {
                 $query->where(function ($q) use ($search) {
                     $q->where('asset_code', 'like', "%{$search}%")
@@ -47,18 +47,36 @@ class VehicleController extends Controller
             })
             ->when($request->query('tax_status'), function ($query, $taxStatus) {
                 $today = now()->startOfDay();
-                $inThirtyDays = $today->copy()->addDays(30);
+                $inSeven = $today->copy()->addDays(7);
+                $inThirty = $today->copy()->addDays(30);
                 switch ($taxStatus) {
-                    case 'overdue':
-                        $query->whereNotNull('tax_due_date')->whereDate('tax_due_date', '<', $today);
+                    case 'paid':
+                        $query->where('tax_status', VehicleAsset::TAX_PAID);
                         break;
-                    case 'due_soon':
-                        $query->whereNotNull('tax_due_date')->whereDate('tax_due_date', '>=', $today)->whereDate('tax_due_date', '<=', $inThirtyDays);
+                    case 'overdue':
+                        $query->where(function ($q) use ($today) {
+                            $q->where('tax_status', '!=', VehicleAsset::TAX_PAID)
+                                ->whereNotNull('tax_due_date')
+                                ->whereDate('tax_due_date', '<', $today);
+                        });
+                        break;
+                    case 'due_7':
+                        $query->where('tax_status', '!=', VehicleAsset::TAX_PAID)
+                            ->whereNotNull('tax_due_date')
+                            ->whereDate('tax_due_date', '>=', $today)
+                            ->whereDate('tax_due_date', '<=', $inSeven);
+                        break;
+                    case 'soon':
+                        $query->where('tax_status', '!=', VehicleAsset::TAX_PAID)
+                            ->whereNotNull('tax_due_date')
+                            ->whereDate('tax_due_date', '>', $inSeven)
+                            ->whereDate('tax_due_date', '<=', $inThirty);
                         break;
                     case 'safe':
-                        $query->where(function ($q) use ($today, $inThirtyDays) {
-                            $q->whereNull('tax_due_date')->orWhereDate('tax_due_date', '>', $inThirtyDays);
-                        });
+                        $query->where(function ($q) use ($today, $inThirty) {
+                            $q->whereNull('tax_due_date')
+                                ->orWhereDate('tax_due_date', '>', $inThirty);
+                        })->orWhere('tax_status', VehicleAsset::TAX_PAID);
                         break;
                 }
             })
@@ -80,10 +98,12 @@ class VehicleController extends Controller
             $validated['asset_code'] = $this->nextVehicleCode();
         }
 
+        $validated['tax_status'] = $validated['tax_status'] ?? VehicleAsset::TAX_UNPAID;
+
         $vehicle = VehicleAsset::create($validated);
 
         return ApiResponse::created([
-            'vehicle' => new VehicleResource($vehicle->load(['team', 'room', 'assignedUser'])),
+            'vehicle' => new VehicleResource($vehicle->load(['team', 'room', 'assignedUser', 'supplier'])),
         ], 'Vehicle asset created successfully.');
     }
 
@@ -93,7 +113,7 @@ class VehicleController extends Controller
     public function show(VehicleAsset $vehicle): JsonResponse
     {
         return ApiResponse::success([
-            'vehicle' => new VehicleResource($vehicle->load(['team', 'room', 'assignedUser'])),
+            'vehicle' => new VehicleResource($vehicle->load(['team', 'room', 'assignedUser', 'supplier'])),
         ]);
     }
 
@@ -105,7 +125,7 @@ class VehicleController extends Controller
         $vehicle->update($request->validated());
 
         return ApiResponse::success([
-            'vehicle' => new VehicleResource($vehicle->fresh()->load(['team', 'room', 'assignedUser'])),
+            'vehicle' => new VehicleResource($vehicle->fresh()->load(['team', 'room', 'assignedUser', 'supplier'])),
         ], 'Vehicle asset updated successfully.');
     }
 

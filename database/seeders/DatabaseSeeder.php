@@ -22,5 +22,7 @@ class DatabaseSeeder extends Seeder
         $this->call(AssetSeeder::class);
         $this->call(PurchaseSeeder::class);
         $this->call(AssetAssignmentSeeder::class);
+        $this->call(SupplierSeeder::class);
+        $this->call(VehicleSeeder::class);
     }
 }
