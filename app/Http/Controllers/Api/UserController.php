@@ -117,6 +117,7 @@ class UserController extends Controller
         // If the role changed, keep Spatie's role in sync.
         if (isset($validated['role'])) {
             $user->syncRoleToSpatie();
+            app(\Spatie\Permission\PermissionRegistrar::class)->forgetCachedPermissions();
         }
 
         return ApiResponse::success([
@@ -168,6 +169,9 @@ class UserController extends Controller
         $user->syncRoleToSpatie();
 
         // Role change may alter token abilities; force a fresh login.
+        $user->tokens()->delete();
+
+        app(\Spatie\Permission\PermissionRegistrar::class)->forgetCachedPermissions();
         $user->tokens()->delete();
 
         return ApiResponse::success([

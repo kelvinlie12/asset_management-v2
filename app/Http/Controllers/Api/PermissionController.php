@@ -10,6 +10,7 @@ use App\Support\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Spatie\Permission\Models\Permission;
+use Spatie\Permission\PermissionRegistrar;
 
 class PermissionController extends Controller
 {
@@ -38,6 +39,8 @@ class PermissionController extends Controller
             'guard_name' => 'web',
         ]);
 
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
+
         return ApiResponse::created([
             'permission' => new PermissionResource($permission),
         ], 'Permission created successfully.');
@@ -62,6 +65,8 @@ class PermissionController extends Controller
             'name' => $request->validated('name'),
         ]);
 
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
+
         return ApiResponse::success([
             'permission' => new PermissionResource($permission->fresh()),
         ], 'Permission updated successfully.');
@@ -77,6 +82,8 @@ class PermissionController extends Controller
         }
 
         $permission->delete();
+
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
 
         return ApiResponse::noContent('Permission deleted successfully.');
     }

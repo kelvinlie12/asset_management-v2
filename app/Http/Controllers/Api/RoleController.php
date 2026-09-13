@@ -11,6 +11,7 @@ use App\Support\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Spatie\Permission\Models\Role;
+use Spatie\Permission\PermissionRegistrar;
 
 class RoleController extends Controller
 {
@@ -92,6 +93,8 @@ class RoleController extends Controller
         $role->permissions()->detach();
         $role->delete();
 
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
+
         return ApiResponse::noContent('Role deleted successfully.');
     }
 
@@ -101,6 +104,9 @@ class RoleController extends Controller
     public function assignPermissions(AssignPermissionsToRoleRequest $request, Role $role): JsonResponse
     {
         $role->permissions()->sync($request->validated('permission_ids'));
+
+        // Drop the Spatie cache so subsequent authorization reads see the new set.
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
 
         return ApiResponse::success([
             'role' => new RoleResource($role->fresh()->load('permissions')),

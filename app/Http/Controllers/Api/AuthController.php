@@ -140,6 +140,9 @@ class AuthController extends Controller
         $data['avatar'] = $user->avatar;
         $data['avatar_url'] = $user->avatar ? url($user->avatar) : null;
 
+        // Effective permissions granted through the user's role(s).
+        $data['permissions'] = $user->getRoleAbilities();
+
         return $data;
     }
 
