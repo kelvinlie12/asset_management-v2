@@ -37,7 +37,7 @@ class AuditLogController extends Controller
                 }
             })
             ->when($request->query('auditable_type'), function ($query, $auditableType) {
-                $query->where('auditable_type', 'like', "%{$auditableType}%");
+                $query->where('auditable_type', 'like', '%' . str_replace('\\', '\\\\', $auditableType) . '%');
             })
             ->when($request->query('user_id'), function ($query, $userId) {
                 $query->where('user_id', $userId);
