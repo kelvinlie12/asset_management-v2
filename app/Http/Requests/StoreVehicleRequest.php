@@ -26,7 +26,7 @@ class StoreVehicleRequest extends FormRequest
     {
         return [
             'asset_code' => ['required', 'string', 'max:50', 'unique:vehicle_assets,asset_code'],
-            'photo' => ['nullable', 'string', 'max:255'],
+            'photo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
             'brand' => ['required', 'string', 'max:255'],
             'model' => ['required', 'string', 'max:255'],
             'year' => ['nullable', 'string', 'max:4', 'regex:/^\d{4}$/'],

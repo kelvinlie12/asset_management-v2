@@ -100,6 +100,10 @@ class VehicleController extends Controller
 
         $validated['tax_status'] = $validated['tax_status'] ?? VehicleAsset::TAX_UNPAID;
 
+        if ($request->hasFile('photo')) {
+            $validated['photo'] = $request->file('photo')->store('vehicle_photos', 'public');
+        }
+
         $vehicle = VehicleAsset::create($validated);
 
         return ApiResponse::created([
@@ -122,6 +126,11 @@ class VehicleController extends Controller
      */
     public function update(UpdateVehicleRequest $request, VehicleAsset $vehicle): JsonResponse
     {
+        if ($request->hasFile('photo')) {
+            $request->validate(['photo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048']]);
+            $vehicle->photo = $request->file('photo')->store('vehicle_photos', 'public');
+        }
+
         $vehicle->update($request->validated());
 
         return ApiResponse::success([
