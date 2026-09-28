@@ -28,7 +28,7 @@ class UpdateVehicleRequest extends FormRequest
 
         return [
             'asset_code' => ['sometimes', 'string', 'max:50', 'unique:vehicle_assets,asset_code,'.$vehicle->id],
-            'photo' => ['sometimes', 'nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
+            'photo' => ['sometimes', 'nullable', 'file', 'max:2048'],
             'brand' => ['sometimes', 'string', 'max:255'],
             'model' => ['sometimes', 'string', 'max:255'],
             'year' => ['sometimes', 'nullable', 'string', 'max:4', 'regex:/^\d{4}$/'],
