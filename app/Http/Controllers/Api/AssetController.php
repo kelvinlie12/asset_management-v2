@@ -15,6 +15,16 @@ use Illuminate\Support\Facades\File;
 class AssetController extends Controller
 {
     /**
+     * Generate a unique asset code.
+     */
+    public function generateCode(): JsonResponse
+    {
+        return ApiResponse::success([
+            'asset_code' => Asset::generateAssetCode(),
+        ], 'Asset code generated.');
+    }
+
+    /**
      * Display a paginated, searchable list of assets.
      */
     public function index(Request $request): JsonResponse

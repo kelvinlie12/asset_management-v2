@@ -23,7 +23,10 @@ class RolePermissionSeeder extends Seeder
         'profile.update',
         'profile.password',
         // User management
-        'user.manage',
+        'users.view',
+        'users.create',
+        'users.update',
+        'users.delete',
         // System
         'system.manage',
         // Role management (RBAC module)
@@ -117,7 +120,10 @@ class RolePermissionSeeder extends Seeder
             'profile.view',
             'profile.update',
             'profile.password',
-            'user.manage',
+            'users.view',
+            'users.create',
+            'users.update',
+            'users.delete',
             'teams.view',
             'teams.create',
             'teams.update',

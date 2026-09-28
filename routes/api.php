@@ -37,19 +37,17 @@ Route::prefix('v1')->group(function () {
         Route::put('/change-password', [AuthController::class, 'changePassword'])
             ->middleware('permission:profile.password');
 
-        // User Management (admin and above)
-        Route::middleware(['permission:user.manage'])->group(function () {
-            Route::get('/users', [UserController::class, 'index']);
-            Route::post('/users', [UserController::class, 'store']);
-            Route::get('/users/{user}', [UserController::class, 'show']);
-            Route::put('/users/{user}', [UserController::class, 'update']);
-            Route::delete('/users/{user}', [UserController::class, 'destroy']);
-            Route::put('/users/{user}/assign-role', [UserController::class, 'assignRole']);
-            Route::put('/users/{user}/assign-team', [UserController::class, 'assignTeam']);
-            Route::post('/users/{user}/reset-password', [UserController::class, 'resetPassword']);
-            Route::post('/users/{user}/deactivate', [UserController::class, 'deactivate']);
-            Route::post('/users/{user}/activate', [UserController::class, 'activate']);
-        });
+        // User Management
+        Route::get('/users', [UserController::class, 'index'])->middleware('permission:users.view');
+        Route::post('/users', [UserController::class, 'store'])->middleware('permission:users.create');
+        Route::get('/users/{user}', [UserController::class, 'show'])->middleware('permission:users.view');
+        Route::put('/users/{user}', [UserController::class, 'update'])->middleware('permission:users.update');
+        Route::delete('/users/{user}', [UserController::class, 'destroy'])->middleware('permission:users.delete');
+        Route::put('/users/{user}/assign-role', [UserController::class, 'assignRole'])->middleware('permission:users.update');
+        Route::put('/users/{user}/assign-team', [UserController::class, 'assignTeam'])->middleware('permission:users.update');
+        Route::post('/users/{user}/reset-password', [UserController::class, 'resetPassword'])->middleware('permission:users.update');
+        Route::post('/users/{user}/deactivate', [UserController::class, 'deactivate'])->middleware('permission:users.update');
+        Route::post('/users/{user}/activate', [UserController::class, 'activate'])->middleware('permission:users.update');
 
         // Team management
         Route::get('/teams', [TeamController::class, 'index'])->middleware('permission:teams.view');
@@ -74,6 +72,7 @@ Route::prefix('v1')->group(function () {
         Route::delete('/categories/{category}', [CategoryController::class, 'destroy'])->middleware('permission:categories.delete');
 
         // Asset (Barang) management
+        Route::get('/assets/generate-code', [AssetController::class, 'generateCode'])->middleware('permission:assets.create');
         Route::get('/assets', [AssetController::class, 'index'])->middleware('permission:assets.view');
         Route::post('/assets', [AssetController::class, 'store'])->middleware('permission:assets.create');
         Route::get('/assets/{asset}', [AssetController::class, 'show'])->middleware('permission:assets.view');
@@ -106,6 +105,7 @@ Route::prefix('v1')->group(function () {
         Route::delete('/damages/{assetDamage}', [AssetDamageController::class, 'destroy'])->middleware('permission:damages.delete');
 
         // Vehicle Asset (Motor) management
+        Route::get('/vehicles/generate-code', [VehicleController::class, 'generateCode'])->middleware('permission:vehicles.create');
         Route::get('/vehicles', [VehicleController::class, 'index'])->middleware('permission:vehicles.view');
         Route::post('/vehicles', [VehicleController::class, 'store'])->middleware('permission:vehicles.create');
         Route::get('/vehicles/{vehicle}', [VehicleController::class, 'show'])->middleware('permission:vehicles.view');

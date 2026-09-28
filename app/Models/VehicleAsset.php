@@ -62,6 +62,7 @@ class VehicleAsset extends Model
         'room_id',
         'assigned_user_id',
         'supplier_id',
+        'placement_date',
     ];
 
     /**
@@ -76,6 +77,7 @@ class VehicleAsset extends Model
             'last_tax_amount' => 'decimal:2',
             'purchase_date' => 'date',
             'tax_due_date' => 'date',
+            'placement_date' => 'date',
         ];
     }
 

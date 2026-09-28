@@ -64,6 +64,25 @@ class Asset extends Model
     }
 
     /**
+     * Generate a unique asset code (AST-001, AST-002, ...).
+     */
+    public static function generateAssetCode(): string
+    {
+        $latest = static::query()
+            ->orderByDesc('id')
+            ->first();
+
+        $number = 1;
+        if ($latest && $latest->asset_code) {
+            if (preg_match('/^AST-(\d+)$/i', $latest->asset_code, $m)) {
+                $number = (int) $m[1] + 1;
+            }
+        }
+
+        return 'AST-' . str_pad((string) $number, 3, '0', STR_PAD_LEFT);
+    }
+
+    /**
      * The room that this asset belongs to.
      *
      * @return BelongsTo<Room, $this>

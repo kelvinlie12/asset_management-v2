@@ -16,9 +16,9 @@ class UserPolicy
         User::ROLE_SUPER_ADMIN => 4,
     ];
 
-    private function canManage(User $user): bool
+    private function canManage(User $user, string $permission): bool
     {
-        return $user->hasPermissionTo('user.manage');
+        return $user->hasPermissionTo($permission);
     }
 
     /**
@@ -26,7 +26,7 @@ class UserPolicy
      */
     public function viewAny(User $user): bool
     {
-        return $this->canManage($user);
+        return $this->canManage($user, 'users.view');
     }
 
     /**
@@ -34,7 +34,7 @@ class UserPolicy
      */
     public function view(User $user, User $model): bool
     {
-        return $this->canManage($user) || $user->id === $model->id;
+        return $this->canManage($user, 'users.view') || $user->id === $model->id;
     }
 
     /**
@@ -42,7 +42,7 @@ class UserPolicy
      */
     public function create(User $user): bool
     {
-        return $this->canManage($user);
+        return $this->canManage($user, 'users.create');
     }
 
     /**
@@ -50,7 +50,7 @@ class UserPolicy
      */
     public function update(User $user, User $model): bool
     {
-        if (! $this->canManage($user)) {
+        if (! $this->canManage($user, 'users.update')) {
             return false;
         }
 
@@ -72,7 +72,7 @@ class UserPolicy
      */
     public function delete(User $user, User $model): bool
     {
-        if (! $this->canManage($user)) {
+        if (! $this->canManage($user, 'users.delete')) {
             return false;
         }
 
@@ -102,7 +102,7 @@ class UserPolicy
      */
     public function assignTeam(User $user, User $model): bool
     {
-        if (! $this->canManage($user)) {
+        if (! $this->canManage($user, 'users.update')) {
             return false;
         }
 

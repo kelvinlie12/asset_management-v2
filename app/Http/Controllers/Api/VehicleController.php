@@ -130,6 +130,16 @@ class VehicleController extends Controller
     }
 
     /**
+     * Generate the next sequential vehicle code (e.g. VHC-007).
+     */
+    public function generateCode(): JsonResponse
+    {
+        return ApiResponse::success([
+            'asset_code' => $this->nextVehicleCode(),
+        ], 'Vehicle code generated.');
+    }
+
+    /**
      * Remove the specified vehicle asset.
      */
     public function destroy(Request $request, VehicleAsset $vehicle): JsonResponse

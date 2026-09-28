@@ -31,12 +31,10 @@ class StoreVehicleRequest extends FormRequest
             'model' => ['required', 'string', 'max:255'],
             'year' => ['nullable', 'string', 'max:4', 'regex:/^\d{4}$/'],
             'plate_number' => ['required', 'string', 'max:20', 'regex:/^[A-Z]{1,2}[ ]?\d{1,4}[ ]?[A-Z]{1,3}$/', 'unique:vehicle_assets,plate_number'],
-            'engine_number' => ['nullable', 'string', 'max:255'],
-            'chassis_number' => ['nullable', 'string', 'max:255'],
-            'purchase_date' => ['nullable', 'date'],
-            'purchase_price' => ['nullable', 'numeric', 'min:0'],
-            'last_tax_amount' => ['nullable', 'numeric', 'min:0'],
-            'tax_due_date' => ['nullable', 'date'],
+            'engine_number' => ['required', 'string', 'max:255'],
+            'chassis_number' => ['required', 'string', 'max:255'],
+            'placement_date' => ['required', 'date'],
+            'tax_due_date' => ['required', 'date'],
             'tax_status' => ['nullable', Rule::in(VehicleAsset::TAX_STATUSES)],
             'description' => ['nullable', 'string'],
             'condition' => ['required', Rule::in(VehicleAsset::CONDITIONS)],
@@ -56,12 +54,12 @@ class StoreVehicleRequest extends FormRequest
         $validator->after(function (Validator $validator) {
             $data = $validator->getData();
 
-            $purchaseDate = $data['purchase_date'] ?? null;
+            $placementDate = $data['placement_date'] ?? null;
             $taxDueDate = $data['tax_due_date'] ?? null;
-            if ($purchaseDate && $taxDueDate && $taxDueDate < $purchaseDate) {
+            if ($placementDate && $taxDueDate && $taxDueDate < $placementDate) {
                 $validator->errors()->add(
                     'tax_due_date',
-                    'The tax due date cannot be before the purchase date.'
+                    'The tax due date cannot be before the placement date.',
                 );
             }
 
@@ -69,7 +67,7 @@ class StoreVehicleRequest extends FormRequest
                 && ($data['usage_status'] ?? null) !== VehicleAsset::USAGE_IN_STORAGE) {
                 $validator->errors()->add(
                     'usage_status',
-                    'A damaged vehicle must be stored (usage status IN_STORAGE).'
+                    'A damaged vehicle must be stored (usage status IN_STORAGE).',
                 );
             }
         });
