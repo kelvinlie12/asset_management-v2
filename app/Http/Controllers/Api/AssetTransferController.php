@@ -8,6 +8,7 @@ use App\Http\Resources\AssetTransferResource;
 use App\Models\Asset;
 use App\Models\AssetTransfer;
 use App\Support\ApiResponse;
+use App\Support\UnitScope;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -23,7 +24,16 @@ class AssetTransferController extends Controller
         $perPage = (int) $request->query('per_page', 15);
         $perPage = min(max($perPage, 1), 100);
 
+        $user = $request->user();
+
         $transfers = AssetTransfer::query()
+            // A transfer is visible when the user's unit is either side of it.
+            ->when($user && ! UnitScope::bypasses($user) && $user->team_id, function ($query) use ($user) {
+                $query->where(function ($q) use ($user) {
+                    $q->where('from_team_id', $user->team_id)
+                        ->orWhere('to_team_id', $user->team_id);
+                });
+            })
             ->with(['asset.room', 'asset.category', 'fromTeam', 'toTeam', 'fromRoom', 'toRoom', 'fromUser', 'toUser', 'performedBy'])
             ->when($request->query('search'), function ($query, $search) {
                 $query->where(function ($q) use ($search) {
@@ -55,7 +65,15 @@ class AssetTransferController extends Controller
     {
         $validated = $request->validated();
 
-        $asset = Asset::query()->findOrFail($validated['asset_id']);
+$asset = Asset::query()->findOrFail($validated['asset_id']);
+        UnitScope::assertAccess($request->user(), $asset->team_id);
+
+        // Network assets are managed by the FTTH module and cannot be moved.
+        if ($asset->hasNetworkNode()) {
+            throw ValidationException::withMessages([
+                'asset_id' => 'Aset yang terpasang sebagai node jaringan tidak dapat dipindahkan lewat Asset Master. Kelola melalui modul Jaringan FTTH.',
+            ]);
+        }
 
         // A damaged asset must remain in storage without a responsible party.
         if ($asset->condition === Asset::CONDITION_DAMAGED
@@ -98,8 +116,10 @@ class AssetTransferController extends Controller
     /**
      * Display the specified transfer history record.
      */
-    public function show(AssetTransfer $assetTransfer): JsonResponse
+    public function show(Request $request, AssetTransfer $assetTransfer): JsonResponse
     {
+        UnitScope::assertTransferAccess($request->user(), $assetTransfer->from_team_id, $assetTransfer->to_team_id);
+
         return ApiResponse::success([
             'transfer' => new AssetTransferResource(
                 $assetTransfer->load(['asset.room', 'asset.category', 'fromTeam', 'toTeam', 'fromRoom', 'toRoom', 'fromUser', 'toUser', 'performedBy'])
@@ -118,8 +138,15 @@ public function update(Request $request, AssetTransfer $assetTransfer): JsonResp
         'reason' => ['nullable', 'string', 'max:1000'],
     ]);
  
-    $asset = Asset::query()->findOrFail($validated['asset_id']);
- 
+$asset = Asset::query()->findOrFail($validated['asset_id']);
+        UnitScope::assertAccess($request->user(), $asset->team_id);
+
+        if ($asset->hasNetworkNode()) {
+        throw ValidationException::withMessages([
+            'asset_id' => 'Aset yang terpasang sebagai node jaringan tidak dapat dipindahkan lewat Asset Master. Kelola melalui modul Jaringan FTTH.',
+        ]);
+    }
+
     if ($asset->condition === Asset::CONDITION_DAMAGED
         && (($validated['to_user_id'] ?? null) || ($validated['to_team_id'] ?? null))) {
         throw ValidationException::withMessages([
@@ -173,8 +200,10 @@ public function update(Request $request, AssetTransfer $assetTransfer): JsonResp
  * placement is rolled back to this transfer's "from" values (the state
  * before this transfer happened).
  */
-public function destroy(AssetTransfer $assetTransfer): JsonResponse
+public function destroy(Request $request, AssetTransfer $assetTransfer): JsonResponse
 {
+    UnitScope::assertTransferAccess($request->user(), $assetTransfer->from_team_id, $assetTransfer->to_team_id);
+
     DB::transaction(function () use ($assetTransfer) {
         $isLatestForAsset = AssetTransfer::query()
             ->where('asset_id', $assetTransfer->asset_id)

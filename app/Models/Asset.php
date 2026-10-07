@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Asset extends Model
 {
@@ -160,5 +161,23 @@ class Asset extends Model
     public function damages(): HasMany
     {
         return $this->hasMany(AssetDamage::class);
+    }
+
+    /**
+     * The FTTH network node this asset has become (if any).
+     *
+     * @return HasOne<NetworkNode, $this>
+     */
+    public function networkNode(): HasOne
+    {
+        return $this->hasOne(NetworkNode::class);
+    }
+
+    /**
+     * Whether this asset is currently used as an FTTH network node.
+     */
+    public function hasNetworkNode(): bool
+    {
+        return $this->networkNode()->exists();
     }
 }

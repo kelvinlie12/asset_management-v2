@@ -24,6 +24,7 @@ class UserResource extends JsonResource
             'role' => $this->role,
             'role_label' => ucwords(str_replace('_', ' ', $this->role)),
             'status' => $this->status,
+            'modules' => $this->getModuleKeys(),
             'team' => $this->whenLoaded('team', fn () => new TeamResource($this->team)),
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,

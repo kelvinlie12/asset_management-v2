@@ -16,7 +16,12 @@ class AssetSeeder extends Seeder
      */
     public function run(): void
     {
-        $room = fn (string $name) => Room::query()->where('name', $name)->first()?->id;
+        // Rooms are owned by a single unit now, so an asset is looked up inside
+        // its own unit's rooms and inherits that unit.
+        $room = fn (string $name, string $teamSlug) => Room::query()
+            ->where('name', $name)
+            ->where('team_id', Team::query()->where('slug', $teamSlug)->value('id'))
+            ->first()?->id;
         $categoryCode = fn (string $code) => Category::query()->where('code', $code)->first()?->id;
         $team = fn (string $slug) => Team::query()->where('slug', $slug)->first()?->id;
         $marketingUser = User::query()->where('email', 'staff@example.com')->first()?->id;
@@ -26,7 +31,8 @@ class AssetSeeder extends Seeder
                 'asset_code' => 'AST-001',
                 'name' => 'Proyektor Epson',
                 'category_id' => $categoryCode('CAT-ELE'),
-                'room_id' => $room('Ruang Rapat A'),
+                'team_id' => $team('development'),
+                'room_id' => $room('Ruang Rapat A', 'development'),
                 'purchase_price' => 4500000,
                 'purchase_date' => '2024-01-15',
                 'purchase_receipt' => 'RCPT-0001',
@@ -38,7 +44,8 @@ class AssetSeeder extends Seeder
                 'asset_code' => 'AST-002',
                 'name' => 'TV 55 Inch',
                 'category_id' => $categoryCode('CAT-ELE'),
-                'room_id' => $room('Ruang Rapat A'),
+                'team_id' => $team('development'),
+                'room_id' => $room('Ruang Rapat A', 'development'),
                 'purchase_price' => 7200000,
                 'purchase_date' => '2024-02-20',
                 'purchase_receipt' => 'RCPT-0002',
@@ -50,7 +57,8 @@ class AssetSeeder extends Seeder
                 'asset_code' => 'AST-003',
                 'name' => 'Server Rack',
                 'category_id' => $categoryCode('CAT-IT'),
-                'room_id' => $room('Server Room'),
+                'team_id' => $team('operations'),
+                'room_id' => $room('Server Room', 'operations'),
                 'purchase_price' => 12500000,
                 'purchase_date' => '2023-11-30',
                 'purchase_receipt' => 'RCPT-0003',
@@ -63,7 +71,7 @@ class AssetSeeder extends Seeder
                 'name' => 'Laptop Dell Latitude',
                 'category_id' => $categoryCode('CAT-IT'),
                 'team_id' => $team('development'),
-                'room_id' => $room('Ruang Rapat B'),
+                'room_id' => $room('Ruang Rapat B', 'development'),
                 'assigned_user_id' => $marketingUser,
                 'purchase_price' => 15900000,
                 'purchase_date' => '2025-03-10',
@@ -76,7 +84,8 @@ class AssetSeeder extends Seeder
                 'asset_code' => 'AST-005',
                 'name' => 'Kursi Kantor Rusak',
                 'category_id' => $categoryCode('CAT-FUR'),
-                'room_id' => $room('Gudang'),
+                'team_id' => $team('development'),
+                'room_id' => $room('Gudang', 'development'),
                 'purchase_price' => 850000,
                 'purchase_date' => '2022-05-10',
                 'purchase_receipt' => 'RCPT-0005',
@@ -88,7 +97,8 @@ class AssetSeeder extends Seeder
                 'asset_code' => 'AST-006',
                 'name' => 'Monitor LG 27 Inch',
                 'category_id' => $categoryCode('CAT-ELE'),
-                'room_id' => $room('Gudang'),
+                'team_id' => $team('development'),
+                'room_id' => $room('Gudang', 'development'),
                 'purchase_price' => 2900000,
                 'purchase_date' => '2024-08-05',
                 'purchase_receipt' => 'RCPT-0006',

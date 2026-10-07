@@ -4,7 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Room extends Model
@@ -30,6 +30,7 @@ class Room extends Model
         'description',
         'status',
         'is_storage',
+        'team_id',
     ];
 
     /**
@@ -43,12 +44,15 @@ class Room extends Model
     }
 
     /**
-     * Teams that can use this room.
+     * The unit that owns this room.
      *
-     * @return BelongsToMany<Team, $this>
+     * A room belongs to exactly one company. Its own users create and manage
+     * it, which is why the unit is a plain column rather than a pivot.
+     *
+     * @return BelongsTo<Team, $this>
      */
-    public function teams(): BelongsToMany
+    public function team(): BelongsTo
     {
-        return $this->belongsToMany(Team::class);
+        return $this->belongsTo(Team::class);
     }
 }

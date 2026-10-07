@@ -30,7 +30,7 @@ class UpdateUserRequest extends FormRequest
             'name' => ['sometimes', 'string', 'max:255'],
             'email' => ['sometimes', 'string', 'email', 'max:255', 'unique:users,email,'.$user->id],
             'role' => ['sometimes', Rule::in(User::ROLES)],
-            'team_id' => ['sometimes', 'nullable', 'integer', 'exists:teams,id'],
+            'team_id' => ['nullable', 'integer', 'exists:teams,id'],
             'phone' => ['sometimes', 'nullable', 'string', 'max:20'],
             'status' => ['sometimes', Rule::in(User::STATUSES)],
             'password' => ['sometimes', 'nullable', Password::min(8)],

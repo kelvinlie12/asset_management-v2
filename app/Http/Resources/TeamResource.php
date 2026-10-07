@@ -21,7 +21,9 @@ class TeamResource extends JsonResource
             'description' => $this->description,
             'status' => $this->status,
             'users_count' => $this->whenCounted('users'),
-            'rooms' => RoomResource::collection($this->whenLoaded('rooms')),
+            // Rooms are owned by the unit and managed on the rooms page, so
+            // only the total is exposed here.
+            'rooms_count' => $this->whenCounted('rooms'),
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
         ];

@@ -36,6 +36,9 @@ class AssetResource extends JsonResource
             'assignments' => AssetAssignmentResource::collection($this->whenLoaded('assignments')),
             'transfers' => AssetTransferResource::collection($this->whenLoaded('transfers')),
             'damages' => AssetDamageResource::collection($this->whenLoaded('damages')),
+            'network_node' => $this->whenLoaded('networkNode', fn () => $this->networkNode
+                ? (new NetworkNodeResource($this->networkNode->loadMissing(['room', 'asset'])))
+                : null),
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
         ];

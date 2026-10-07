@@ -2,6 +2,8 @@
 
 namespace App\Http\Requests;
 
+use App\Rules\RoomBelongsToUnit;
+use App\Rules\UserBelongsToUnit;
 use App\Models\Asset;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -26,9 +28,9 @@ class StoreAssetDamageRequest extends FormRequest
     {
         return [
             'asset_id' => ['required', Rule::exists('assets', 'id')],
-            'room_id' => ['nullable', Rule::exists('rooms', 'id')],
+            'room_id' => ['nullable', Rule::exists('rooms', 'id'), new RoomBelongsToUnit($this->user())],
             'damage_date' => ['required', 'date'],
-            'user_id' => ['nullable', Rule::exists('users', 'id')],
+            'user_id' => ['nullable', Rule::exists('users', 'id'), new UserBelongsToUnit($this->user())],
             'responsible_id' => ['nullable', Rule::exists('users', 'id')],
             'description' => ['required', 'string'],
             'photo' => ['nullable', 'image', 'max:5120'],

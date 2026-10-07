@@ -29,8 +29,7 @@ class UpdateTeamRequest extends FormRequest
             'name' => ['sometimes', 'string', 'max:255', 'unique:teams,name,'.$team->id],
             'description' => ['sometimes', 'nullable', 'string'],
             'status' => ['sometimes', Rule::in(Team::STATUSES)],
-            'room_ids' => ['sometimes', 'array'],
-            'room_ids.*' => ['integer', 'exists:rooms,id'],
+            // Rooms are managed on the rooms page by the unit that owns them.
         ];
     }
 }

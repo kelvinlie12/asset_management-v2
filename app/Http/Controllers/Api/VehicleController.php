@@ -5,9 +5,12 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreVehicleRequest;
 use App\Http\Requests\UpdateVehicleRequest;
+use App\Http\Resources\TeamResource;
 use App\Http\Resources\VehicleResource;
+use App\Models\Team;
 use App\Models\VehicleAsset;
 use App\Support\ApiResponse;
+use App\Support\UnitScope;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -21,7 +24,7 @@ class VehicleController extends Controller
         $perPage = (int) $request->query('per_page', 15);
         $perPage = min(max($perPage, 1), 100);
 
-        $vehicles = VehicleAsset::query()
+        $vehicles = UnitScope::apply(VehicleAsset::query(), $request->user())
             ->with(['team', 'room', 'assignedUser', 'supplier'])
             ->when($request->query('search'), function ($query, $search) {
                 $query->where(function ($q) use ($search) {
@@ -88,11 +91,65 @@ class VehicleController extends Controller
     }
 
     /**
+     * Summarise the vehicle fleet of every company the caller may see.
+     *
+     * Each unit owns its vehicles outright, so this answers "which unit has
+     * which vehicles" in one call: a super admin gets a row per unit, while a
+     * unit-scoped user only ever gets their own.
+     */
+    public function unitSummary(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $today = now()->startOfDay();
+
+        $teams = Team::query()
+            ->when(! UnitScope::bypasses($user) && $user?->team_id, fn ($query) => $query->whereKey($user->team_id))
+            ->orderBy('name')
+            ->get();
+
+        $counts = VehicleAsset::query()
+            ->whereNotNull('team_id')
+            ->whereIn('team_id', $teams->pluck('id'))
+            ->selectRaw('team_id, count(*) as total')
+            ->selectRaw("sum(case when tax_status = '".VehicleAsset::TAX_PAID."' then 1 else 0 end) as paid")
+            ->selectRaw("sum(case when tax_status != '".VehicleAsset::TAX_PAID."'
+                and tax_due_date is not null and tax_due_date < ? then 1 else 0 end) as overdue", [$today])
+            ->selectRaw("sum(case when tax_status != '".VehicleAsset::TAX_PAID."'
+                and tax_due_date is not null and tax_due_date between ? and ? then 1 else 0 end) as due_soon",
+            [$today, $today->copy()->addDays(7)])
+            ->groupBy('team_id')
+            ->get()
+            ->keyBy('team_id');
+
+        $units = $teams->map(function (Team $team) use ($counts) {
+            $row = $counts->get($team->id);
+
+            return [
+                'team' => new TeamResource($team),
+                'total' => (int) ($row->total ?? 0),
+                'tax_paid' => (int) ($row->paid ?? 0),
+                'tax_overdue' => (int) ($row->overdue ?? 0),
+                'tax_due_soon' => (int) ($row->due_soon ?? 0),
+            ];
+        })->values();
+
+        return ApiResponse::success(['units' => $units]);
+    }
+
+    /**
      * Store a newly created vehicle asset.
      */
     public function store(StoreVehicleRequest $request): JsonResponse
     {
         $validated = $request->validated();
+        $validated['team_id'] = UnitScope::resolveTeamId($request->user(), $validated['team_id'] ?? null);
+
+        // A vehicle has to belong to a company: unit-scoped users are pinned to
+        // their own unit above, but a super admin can post without one, which
+        // would leave the vehicle invisible to every unit owner.
+        if (empty($validated['team_id'])) {
+            return ApiResponse::error('A unit is required so the vehicle belongs to a company.', null, 422);
+        }
 
         if (empty($validated['asset_code'])) {
             $validated['asset_code'] = $this->nextVehicleCode();
@@ -114,8 +171,10 @@ class VehicleController extends Controller
     /**
      * Display the specified vehicle asset.
      */
-    public function show(VehicleAsset $vehicle): JsonResponse
+    public function show(Request $request, VehicleAsset $vehicle): JsonResponse
     {
+        UnitScope::assertAccess($request->user(), $vehicle->team_id);
+
         return ApiResponse::success([
             'vehicle' => new VehicleResource($vehicle->load(['team', 'room', 'assignedUser', 'supplier'])),
         ]);
@@ -126,12 +185,30 @@ class VehicleController extends Controller
      */
     public function update(UpdateVehicleRequest $request, VehicleAsset $vehicle): JsonResponse
     {
+        UnitScope::assertAccess($request->user(), $vehicle->team_id);
+
+        $data = $request->validated();
+        if (! UnitScope::bypasses($request->user())) {
+            $data['team_id'] = $request->user()?->team_id ?: $vehicle->team_id;
+        } elseif (empty($data['team_id'])) {
+            // Never detach a vehicle from its company by posting a blank unit.
+            unset($data['team_id']);
+        }
+
+        // Handing a vehicle to another company invalidates its placement: the
+        // room and the assigned user both belong to the previous unit, so
+        // keeping them would leave the record pointing across units.
+        if (array_key_exists('team_id', $data) && $data['team_id'] != $vehicle->team_id) {
+            $data['room_id'] = null;
+            $data['assigned_user_id'] = null;
+        }
+
         if ($request->hasFile('photo')) {
             $request->validate(['photo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048']]);
             $vehicle->photo = $request->file('photo')->store('vehicle_photos', 'public');
         }
 
-        $vehicle->update($request->validated());
+        $vehicle->update($data);
 
         return ApiResponse::success([
             'vehicle' => new VehicleResource($vehicle->fresh()->load(['team', 'room', 'assignedUser', 'supplier'])),
@@ -153,6 +230,8 @@ class VehicleController extends Controller
      */
     public function destroy(Request $request, VehicleAsset $vehicle): JsonResponse
     {
+        UnitScope::assertAccess($request->user(), $vehicle->team_id);
+
         $vehicle->delete();
 
         return ApiResponse::noContent('Vehicle asset deleted successfully.');

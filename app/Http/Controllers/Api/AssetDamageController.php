@@ -10,10 +10,12 @@ use App\Models\Asset;
 use App\Models\AssetDamage;
 use App\Models\Room;
 use App\Support\ApiResponse;
+use App\Support\UnitScope;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
+use Illuminate\Validation\ValidationException;
 
 class AssetDamageController extends Controller
 {
@@ -25,8 +27,11 @@ class AssetDamageController extends Controller
         $perPage = (int) $request->query('per_page', 15);
         $perPage = min(max($perPage, 1), 100);
 
-        $damages = AssetDamage::query()
-            ->with(['asset.room', 'asset.category', 'room', 'user', 'responsible', 'performedBy'])
+        $damages = UnitScope::applyToRelation(
+            AssetDamage::query(),
+            $request->user(),
+            'asset'
+        )->with(['asset.room', 'asset.category', 'room', 'user', 'responsible', 'performedBy'])
             ->when($request->query('search'), function ($query, $search) {
                 $query->where(function ($q) use ($search) {
                     $q->where('description', 'like', "%{$search}%")
@@ -74,6 +79,14 @@ class AssetDamageController extends Controller
         }
 
         $asset = Asset::query()->findOrFail($validated['asset_id']);
+        UnitScope::assertAccess($request->user(), $asset->team_id);
+
+        // Network assets cannot be marked as damaged this way.
+        if ($asset->hasNetworkNode()) {
+            throw ValidationException::withMessages([
+                'asset_id' => 'Aset yang terpasang sebagai node jaringan tidak boleh dilaporkan rusak. Hapus node jaringan (Jaringan FTTH) terlebih dahulu.',
+            ]);
+        }
 
         $damage = DB::transaction(function () use ($validated, $asset, $photoPath, $request) {
             $damage = AssetDamage::create([
@@ -113,8 +126,10 @@ class AssetDamageController extends Controller
     /**
      * Display the specified damage report.
      */
-    public function show(AssetDamage $assetDamage): JsonResponse
+    public function show(Request $request, AssetDamage $assetDamage): JsonResponse
     {
+        UnitScope::assertAccess($request->user(), $assetDamage->asset?->team_id);
+
         return ApiResponse::success([
             'damage' => new AssetDamageResource(
                 $assetDamage->load(['asset.room', 'asset.category', 'room', 'user', 'responsible', 'performedBy'])
@@ -127,6 +142,7 @@ class AssetDamageController extends Controller
      */
     public function update(UpdateAssetDamageRequest $request, AssetDamage $assetDamage): JsonResponse
     {
+        UnitScope::assertAccess($request->user(), $assetDamage->asset?->team_id);
         $validated = $request->validated();
 
         if ($request->hasFile('photo')) {
@@ -163,8 +179,9 @@ class AssetDamageController extends Controller
     /**
      * Remove the specified damage report and its photo file.
      */
-    public function destroy(AssetDamage $assetDamage): JsonResponse
+    public function destroy(Request $request, AssetDamage $assetDamage): JsonResponse
     {
+        UnitScope::assertAccess($request->user(), $assetDamage->asset?->team_id);
         if ($assetDamage->photo_path) {
             $path = public_path($assetDamage->photo_path);
             if (File::exists($path)) {

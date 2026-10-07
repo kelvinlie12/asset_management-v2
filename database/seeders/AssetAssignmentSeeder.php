@@ -21,16 +21,21 @@ class AssetAssignmentSeeder extends Seeder
         }
 
         $teamDev = fn () => Team::query()->where('slug', 'development')->first()?->id;
-        $teamMarketing = fn () => Team::query()->where('slug', 'marketing')->first()?->id;
-        $roomA = fn () => Room::query()->where('name', 'Ruang Rapat A')->first()?->id;
-        $roomB = fn () => Room::query()->where('name', 'Ruang Rapat B')->first()?->id;
+        // A room is owned by one unit, so every room lookup is scoped to the
+        // same unit the asset is recorded under.
+        $roomOf = fn (string $name) => fn (string $slug) => Room::query()
+            ->where('name', $name)
+            ->where('team_id', Team::query()->where('slug', $slug)->value('id'))
+            ->value('id');
+        $roomA = $roomOf('Ruang Rapat A');
+        $roomB = $roomOf('Ruang Rapat B');
         $staff = fn () => User::query()->where('email', 'staff@example.com')->first()?->id;
 
         $assignments = [
             [
                 'asset_code' => 'AST-004',
                 'team_id' => $teamDev(),
-                'room_id' => $roomB(),
+                'room_id' => $roomB('development'),
                 'assigned_user_id' => $staff(),
                 'assigned_date' => '2025-03-12',
                 'notes' => 'Penempatan awal laptop untuk tim pengembangan.',
@@ -38,15 +43,15 @@ class AssetAssignmentSeeder extends Seeder
             [
                 'asset_code' => 'AST-001',
                 'team_id' => $teamDev(),
-                'room_id' => $roomA(),
+                'room_id' => $roomA('development'),
                 'assigned_user_id' => null,
                 'assigned_date' => '2024-02-10',
                 'notes' => 'Dipinjam untuk rapat Q1, kemudian dikembalikan ke storage.',
             ],
             [
                 'asset_code' => 'AST-002',
-                'team_id' => $teamMarketing(),
-                'room_id' => $roomA(),
+                'team_id' => $teamDev(),
+                'room_id' => $roomA('development'),
                 'assigned_user_id' => $staff(),
                 'assigned_date' => '2024-03-05',
                 'notes' => 'Digunakan untuk presentasi produk.',

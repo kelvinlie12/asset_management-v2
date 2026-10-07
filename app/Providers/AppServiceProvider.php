@@ -7,6 +7,7 @@ use App\Models\AssetAssignment;
 use App\Models\AssetDamage;
 use App\Models\AssetTransfer;
 use App\Models\Category;
+use App\Models\NetworkNode;
 use App\Models\Purchase;
 use App\Models\Room;
 use App\Models\Supplier;
@@ -45,6 +46,7 @@ class AppServiceProvider extends ServiceProvider
             AssetDamage::class,
             AssetTransfer::class,
             Category::class,
+            NetworkNode::class,
             Purchase::class,
             Role::class,
             Room::class,

@@ -2,6 +2,8 @@
 
 namespace App\Http\Requests;
 
+use App\Rules\RoomBelongsToUnit;
+use App\Rules\UserBelongsToUnit;
 use App\Models\Asset;
 use App\Models\Room;
 use Illuminate\Foundation\Http\FormRequest;
@@ -40,8 +42,8 @@ class UpdateAssetRequest extends FormRequest
             'condition' => ['sometimes', Rule::in(Asset::CONDITIONS)],
             'usage_status' => ['sometimes', Rule::in(Asset::USAGE_STATUSES)],
             'team_id' => ['sometimes', 'nullable', Rule::exists('teams', 'id')],
-            'room_id' => ['sometimes', 'nullable', Rule::exists('rooms', 'id')],
-            'assigned_user_id' => ['sometimes', 'nullable', Rule::exists('users', 'id')],
+            'room_id' => ['sometimes', 'nullable', Rule::exists('rooms', 'id'), new RoomBelongsToUnit($this->user())],
+            'assigned_user_id' => ['sometimes', 'nullable', Rule::exists('users', 'id'), new UserBelongsToUnit($this->user())],
         ];
     }
 

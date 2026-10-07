@@ -9,6 +9,7 @@ use App\Http\Resources\VehicleTaxResource;
 use App\Models\VehicleAsset;
 use App\Models\VehicleTax;
 use App\Support\ApiResponse;
+use App\Support\UnitScope;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -19,6 +20,8 @@ class VehicleTaxController extends Controller
      */
     public function index(Request $request, VehicleAsset $vehicle): JsonResponse
     {
+        UnitScope::assertAccess($request->user(), $vehicle->team_id);
+
         $perPage = (int) $request->query('per_page', 10);
         $perPage = min(max($perPage, 1), 100);
 
@@ -38,6 +41,8 @@ class VehicleTaxController extends Controller
      */
     public function store(StoreVehicleTaxRequest $request, VehicleAsset $vehicle): JsonResponse
     {
+        UnitScope::assertAccess($request->user(), $vehicle->team_id);
+
         $data = $this->mergeTotal($request->validated());
 
         $tax = $vehicle->taxes()->create($data);
@@ -54,6 +59,7 @@ class VehicleTaxController extends Controller
      */
     public function show(Request $request, VehicleAsset $vehicle, VehicleTax $vehicleTax): JsonResponse
     {
+        UnitScope::assertAccess($request->user(), $vehicle->team_id);
         abort_unless($vehicleTax->vehicle_id === $vehicle->id, 404, 'Tax record not found for this vehicle.');
 
         return ApiResponse::success([
@@ -66,6 +72,7 @@ class VehicleTaxController extends Controller
      */
     public function update(UpdateVehicleTaxRequest $request, VehicleAsset $vehicle, VehicleTax $vehicleTax): JsonResponse
     {
+        UnitScope::assertAccess($request->user(), $vehicle->team_id);
         abort_unless($vehicleTax->vehicle_id === $vehicle->id, 404, 'Tax record not found for this vehicle.');
 
         $vehicleTax->update($this->mergeTotal($request->validated()));
@@ -82,6 +89,7 @@ class VehicleTaxController extends Controller
      */
     public function destroy(Request $request, VehicleAsset $vehicle, VehicleTax $vehicleTax): JsonResponse
     {
+        UnitScope::assertAccess($request->user(), $vehicle->team_id);
         abort_unless($vehicleTax->vehicle_id === $vehicle->id, 404, 'Tax record not found for this vehicle.');
 
         $vehicleTax->delete();

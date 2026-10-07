@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Rules\RoomBelongsToUnit;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -25,7 +26,7 @@ class StorePurchaseRequest extends FormRequest
         return [
             'name' => ['required', 'string', 'max:255'],
             'category_id' => ['nullable', Rule::exists('categories', 'id')],
-            'room_id' => ['nullable', Rule::exists('rooms', 'id')],
+            'room_id' => ['nullable', Rule::exists('rooms', 'id'), new RoomBelongsToUnit($this->user())],
             'amount' => ['required', 'numeric', 'min:0'],
             'purchase_date' => ['required', 'date'],
             'supplier' => ['required', 'string', 'max:255'],

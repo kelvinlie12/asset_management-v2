@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Models\User;
 use App\Models\VehicleAsset;
 use Carbon\Carbon;
 
@@ -26,11 +27,14 @@ class VehicleTaxReminder
      *
      * @return array{summary: array<string, int>, vehicles: \Illuminate\Support\Collection<int, VehicleAsset>}
      */
-    public static function summarize(): array
+    public static function summarize(?User $user = null): array
     {
         $today = Carbon::today();
 
-        $vehicles = VehicleAsset::query()
+        // Restrict the reminder to the user's own unit unless they bypass scoping.
+        $query = UnitScope::apply(VehicleAsset::query(), $user);
+
+        $vehicles = $query
             ->with(['team', 'room', 'assignedUser', 'supplier'])
             ->get();
 

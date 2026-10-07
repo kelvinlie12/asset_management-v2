@@ -2,6 +2,8 @@
 
 namespace App\Http\Requests;
 
+use App\Rules\RoomBelongsToUnit;
+use App\Rules\UserBelongsToUnit;
 use App\Models\Room;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -28,8 +30,8 @@ class StoreAssetAssignmentRequest extends FormRequest
             'asset_id' => ['required', Rule::exists('assets', 'id')],
             'assigned_date' => ['required', 'date'],
             'team_id' => ['nullable', Rule::exists('teams', 'id')],
-            'room_id' => ['nullable', Rule::exists('rooms', 'id')],
-            'assigned_user_id' => ['nullable', Rule::exists('users', 'id')],
+            'room_id' => ['nullable', Rule::exists('rooms', 'id'), new RoomBelongsToUnit($this->user())],
+            'assigned_user_id' => ['nullable', Rule::exists('users', 'id'), new UserBelongsToUnit($this->user())],
             'notes' => ['nullable', 'string'],
         ];
     }

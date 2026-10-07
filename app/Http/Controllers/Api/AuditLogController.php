@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\AuditLogResource;
 use App\Models\AuditLog;
 use App\Support\ApiResponse;
+use App\Support\UnitScope;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -19,8 +20,14 @@ class AuditLogController extends Controller
         $perPage = (int) $request->query('per_page', 15);
         $perPage = min(max($perPage, 1), 100);
 
+        $user = $request->user();
+
         $logs = AuditLog::query()
             ->with(['user'])
+            // A unit only sees activity performed by its own members.
+            ->when($user && ! UnitScope::bypasses($user) && $user->team_id, function ($query) use ($user) {
+                $query->whereHas('user', fn ($member) => $member->where('team_id', $user->team_id));
+            })
             ->when($request->query('search'), function ($query, $search) {
                 $query->where(function ($q) use ($search) {
                     $q->whereHas('user', function ($user) use ($search) {

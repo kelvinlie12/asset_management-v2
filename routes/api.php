@@ -8,6 +8,8 @@ use App\Http\Controllers\Api\AuditLogController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\DashboardController;
+use App\Http\Controllers\Api\LookupController;
+use App\Http\Controllers\Api\NetworkNodeController;
 use App\Http\Controllers\Api\PermissionController;
 use App\Http\Controllers\Api\PurchaseController;
 use App\Http\Controllers\Api\RoleController;
@@ -37,11 +39,17 @@ Route::prefix('v1')->group(function () {
         Route::put('/change-password', [AuthController::class, 'changePassword'])
             ->middleware('permission:profile.password');
 
+        // Dropdown data shared by forms; gated on assets.view so the asset
+        // module keeps working without the master-data permissions.
+        Route::get('/lookups', [LookupController::class, 'index'])->middleware('permission:assets.view');
+
         // User Management
         Route::get('/users', [UserController::class, 'index'])->middleware('permission:users.view');
+        Route::get('/users/module-catalog', [UserController::class, 'moduleCatalog'])->middleware('permission:users.view');
         Route::post('/users', [UserController::class, 'store'])->middleware('permission:users.create');
         Route::get('/users/{user}', [UserController::class, 'show'])->middleware('permission:users.view');
         Route::put('/users/{user}', [UserController::class, 'update'])->middleware('permission:users.update');
+        Route::put('/users/{user}/modules', [UserController::class, 'updateModules'])->middleware('permission:users.update');
         Route::delete('/users/{user}', [UserController::class, 'destroy'])->middleware('permission:users.delete');
         Route::put('/users/{user}/assign-role', [UserController::class, 'assignRole'])->middleware('permission:users.update');
         Route::put('/users/{user}/assign-team', [UserController::class, 'assignTeam'])->middleware('permission:users.update');
@@ -54,8 +62,7 @@ Route::prefix('v1')->group(function () {
         Route::post('/teams', [TeamController::class, 'store'])->middleware('permission:teams.create');
         Route::get('/teams/{team}', [TeamController::class, 'show'])->middleware('permission:teams.view');
         Route::put('/teams/{team}', [TeamController::class, 'update'])->middleware('permission:teams.update');
-        Route::delete('/teams/{team}', [TeamController::class, 'destroy'])->middleware('permission:teams.delete');
-        Route::put('/teams/{team}/rooms', [TeamController::class, 'assignRooms'])->middleware('permission:teams.update');
+Route::delete('/teams/{team}', [TeamController::class, 'destroy'])->middleware('permission:teams.delete');
 
         // Room (Ruangan) management
         Route::get('/rooms', [RoomController::class, 'index'])->middleware('permission:rooms.view');
@@ -105,8 +112,10 @@ Route::prefix('v1')->group(function () {
         Route::delete('/damages/{assetDamage}', [AssetDamageController::class, 'destroy'])->middleware('permission:damages.delete');
 
         // Vehicle Asset (Motor) management
-        Route::get('/vehicles/generate-code', [VehicleController::class, 'generateCode'])->middleware('permission:vehicles.create');
-        Route::get('/vehicles', [VehicleController::class, 'index'])->middleware('permission:vehicles.view');
+Route::get('/vehicles/generate-code', [VehicleController::class, 'generateCode'])->middleware('permission:vehicles.create');
+// Declared before /vehicles/{vehicle} so "unit-summary" is not read as an id.
+Route::get('/vehicles/unit-summary', [VehicleController::class, 'unitSummary'])->middleware('permission:vehicles.view');
+Route::get('/vehicles', [VehicleController::class, 'index'])->middleware('permission:vehicles.view');
         Route::post('/vehicles', [VehicleController::class, 'store'])->middleware('permission:vehicles.create');
         Route::get('/vehicles/{vehicle}', [VehicleController::class, 'show'])->middleware('permission:vehicles.view');
         Route::put('/vehicles/{vehicle}', [VehicleController::class, 'update'])->middleware('permission:vehicles.update');
@@ -125,6 +134,15 @@ Route::prefix('v1')->group(function () {
         Route::get('/suppliers/{supplier}', [SupplierController::class, 'show'])->middleware('permission:suppliers.view');
         Route::put('/suppliers/{supplier}', [SupplierController::class, 'update'])->middleware('permission:suppliers.update');
         Route::delete('/suppliers/{supplier}', [SupplierController::class, 'destroy'])->middleware('permission:suppliers.delete');
+
+        // FTTH Network (Jaringan FTTH) module
+        Route::get('/network-nodes/available-assets', [NetworkNodeController::class, 'availableAssets'])->middleware('permission:network.view');
+        Route::get('/network-nodes/tree', [NetworkNodeController::class, 'tree'])->middleware('permission:network.view');
+        Route::get('/network-nodes', [NetworkNodeController::class, 'index'])->middleware('permission:network.view');
+        Route::post('/network-nodes', [NetworkNodeController::class, 'store'])->middleware('permission:network.create');
+        Route::get('/network-nodes/{networkNode}', [NetworkNodeController::class, 'show'])->middleware('permission:network.view');
+        Route::put('/network-nodes/{networkNode}', [NetworkNodeController::class, 'update'])->middleware('permission:network.update');
+        Route::delete('/network-nodes/{networkNode}', [NetworkNodeController::class, 'destroy'])->middleware('permission:network.delete');
 
         // Vehicle Tax Reminder
         Route::get('/vehicle-tax-reminders', [VehicleTaxReminderController::class, 'index'])->middleware('permission:vehicles.view');

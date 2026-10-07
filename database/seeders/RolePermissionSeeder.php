@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\User;
+use App\Support\ModuleCatalog;
 use Illuminate\Database\Seeder;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
@@ -89,6 +90,11 @@ class RolePermissionSeeder extends Seeder
         'suppliers.create',
         'suppliers.update',
         'suppliers.delete',
+        // FTTH Network (Jaringan FTTH)
+        'network.view',
+        'network.create',
+        'network.update',
+        'network.delete',
         // Audit log (Log Aktivitas)
         'audit_logs.view',
     ];
@@ -115,6 +121,7 @@ class RolePermissionSeeder extends Seeder
             'transfers.view',
             'damages.view',
             'vehicles.view',
+            'network.view',
         ],
         User::ROLE_ADMIN => [
             'profile.view',
@@ -163,7 +170,18 @@ class RolePermissionSeeder extends Seeder
             'suppliers.create',
             'suppliers.update',
             'suppliers.delete',
+            'network.view',
+            'network.create',
+            'network.update',
+            'network.delete',
             'audit_logs.view',
+        ],
+        // Unit owner: profile access only. Feature modules are granted per
+        // user (see ModuleCatalog) so each owner sees a different menu.
+        User::ROLE_OWNER => [
+            'profile.view',
+            'profile.update',
+            'profile.password',
         ],
         User::ROLE_SUPER_ADMIN => self::PERMISSIONS,
     ];
@@ -190,6 +208,17 @@ class RolePermissionSeeder extends Seeder
         User::query()->each(function (User $user) {
             $user->syncRoleToSpatie();
         });
+
+        // Trimming the owner role down to profile permissions would otherwise
+        // strip the menu of any owner who was configured by hand instead of by
+        // OwnerSeeder. Owners with no module grants of their own fall back to
+        // the default set; a super admin can still clear it from the UI.
+        User::query()
+            ->where('role', User::ROLE_OWNER)
+            ->whereDoesntHave('permissions')
+            ->each(function (User $user) {
+                $user->syncModules(ModuleCatalog::DEFAULT_OWNER_MODULES);
+            });
 
         // Drop the cached snapshot so subsequent lookups see the current rows.
         app(PermissionRegistrar::class)->forgetCachedPermissions();

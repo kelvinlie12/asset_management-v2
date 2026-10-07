@@ -4,7 +4,6 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Str;
 
@@ -52,12 +51,12 @@ class Team extends Model
     }
 
     /**
-     * Rooms that this team can use.
+     * Rooms owned by this team.
      *
-     * @return BelongsToMany<Room, $this>
+     * @return HasMany<Room, $this>
      */
-    public function rooms(): BelongsToMany
+    public function rooms(): HasMany
     {
-        return $this->belongsToMany(Room::class);
+        return $this->hasMany(Room::class);
     }
 }

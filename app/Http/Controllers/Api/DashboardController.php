@@ -11,29 +11,41 @@ use App\Models\Team;
 use App\Models\User;
 use App\Models\VehicleAsset;
 use App\Support\ApiResponse;
+use App\Support\UnitScope;
 use App\Support\VehicleTaxReminder;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class DashboardController extends Controller
 {
-    public function show(): JsonResponse
+    public function show(Request $request): JsonResponse
     {
-        $totalAssets = Asset::count();
-        $assetsInUse = Asset::where('usage_status', Asset::USAGE_IN_USE)->count();
-        $assetsInStorage = Asset::where('usage_status', Asset::USAGE_IN_STORAGE)->count();
-        $assetsDamaged = Asset::where('condition', Asset::CONDITION_DAMAGED)->count();
-        $totalAssetValue = (float) Asset::whereNotNull('purchase_price')->sum('purchase_price');
+        $user = $request->user();
+        $bypass = UnitScope::bypasses($user);
 
-        $totalAssets += VehicleAsset::count();
-        $assetsInUse += VehicleAsset::where('usage_status', VehicleAsset::USAGE_IN_USE)->count();
-        $assetsInStorage += VehicleAsset::where('usage_status', VehicleAsset::USAGE_IN_STORAGE)->count();
-        $assetsDamaged += VehicleAsset::where('condition', VehicleAsset::CONDITION_DAMAGED)->count();
-        $assetsGood = Asset::where('condition', Asset::CONDITION_GOOD)->count()
-            + VehicleAsset::where('condition', VehicleAsset::CONDITION_GOOD)->count();
-        $totalAssetValue += (float) VehicleAsset::whereNotNull('purchase_price')->sum('purchase_price');
+        $assetQuery = Asset::query();
+        $vehicleQuery = VehicleAsset::query();
+        if (! $bypass && $user && $user->team_id) {
+            $assetQuery->where('team_id', $user->team_id);
+            $vehicleQuery->where('team_id', $user->team_id);
+        }
 
-        $taxSummary = VehicleTaxReminder::summarize()['summary'];
+        $totalAssets = $assetQuery->count();
+        $assetsInUse = (clone $assetQuery)->where('usage_status', Asset::USAGE_IN_USE)->count();
+        $assetsInStorage = (clone $assetQuery)->where('usage_status', Asset::USAGE_IN_STORAGE)->count();
+        $assetsDamaged = (clone $assetQuery)->where('condition', Asset::CONDITION_DAMAGED)->count();
+        $totalAssetValue = (float) (clone $assetQuery)->whereNotNull('purchase_price')->sum('purchase_price');
+
+        $totalAssets += $vehicleQuery->count();
+        $assetsInUse += (clone $vehicleQuery)->where('usage_status', VehicleAsset::USAGE_IN_USE)->count();
+        $assetsInStorage += (clone $vehicleQuery)->where('usage_status', VehicleAsset::USAGE_IN_STORAGE)->count();
+        $assetsDamaged += (clone $vehicleQuery)->where('condition', VehicleAsset::CONDITION_DAMAGED)->count();
+        $assetsGood = (clone $assetQuery)->where('condition', Asset::CONDITION_GOOD)->count()
+            + (clone $vehicleQuery)->where('condition', VehicleAsset::CONDITION_GOOD)->count();
+        $totalAssetValue += (float) (clone $vehicleQuery)->whereNotNull('purchase_price')->sum('purchase_price');
+
+        $taxSummary = VehicleTaxReminder::summarize($user)['summary'];
 
         $assetsByCategory = Category::query()
             ->whereHas('assets')
@@ -52,7 +64,7 @@ class DashboardController extends Controller
             ['label' => 'Damaged', 'value' => $assetsDamaged],
         ];
 
-        $assetsByTeam = Asset::query()
+        $assetsByTeam = (clone $assetQuery)
             ->whereNotNull('team_id')
             ->select('team_id', DB::raw('count(*) as total'))
             ->groupBy('team_id')
@@ -66,7 +78,7 @@ class DashboardController extends Controller
             ->all();
 
         // Combine vehicle assets into team buckets.
-        $vehicleTeamTotals = VehicleAsset::query()
+        $vehicleTeamTotals = (clone $vehicleQuery)
             ->whereNotNull('team_id')
             ->select('team_id', DB::raw('count(*) as total'))
             ->groupBy('team_id')

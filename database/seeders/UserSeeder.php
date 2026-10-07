@@ -46,12 +46,13 @@ class UserSeeder extends Seeder
         }
 
         $users = [
+            // Super admin is not attached to any unit and can access all units.
             [
                 'name' => 'Super Admin',
                 'email' => 'superadmin@example.com',
                 'password' => 'password',
                 'role' => User::ROLE_SUPER_ADMIN,
-                'team_id' => $teamModels[0]->id,
+                'team_id' => null,
             ],
             [
                 'name' => 'Admin User',

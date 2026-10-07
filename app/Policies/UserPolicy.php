@@ -12,8 +12,9 @@ class UserPolicy
     private const ROLE_RANK = [
         User::ROLE_VIEWER => 1,
         User::ROLE_STAFF => 2,
-        User::ROLE_ADMIN => 3,
-        User::ROLE_SUPER_ADMIN => 4,
+        User::ROLE_OWNER => 3,
+        User::ROLE_ADMIN => 4,
+        User::ROLE_SUPER_ADMIN => 5,
     ];
 
     private function canManage(User $user, string $permission): bool
@@ -59,8 +60,8 @@ class UserPolicy
             return false;
         }
 
-        // A non-super-admin cannot manage super admins or other admins.
-        if (! $user->isSuperAdmin() && in_array($model->role, [User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN], true)) {
+        // A non-super-admin cannot manage super admins, admins, or other owners.
+        if (! $user->isSuperAdmin() && in_array($model->role, [User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN, User::ROLE_OWNER], true)) {
             return false;
         }
 

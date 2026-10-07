@@ -8,6 +8,7 @@ use App\Http\Resources\PurchaseResource;
 use App\Models\Asset;
 use App\Models\Purchase;
 use App\Support\ApiResponse;
+use App\Support\UnitScope;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -23,8 +24,13 @@ class PurchaseController extends Controller
         $perPage = (int) $request->query('per_page', 15);
         $perPage = min(max($perPage, 1), 100);
 
+        $user = $request->user();
+
         $purchases = Purchase::query()
             ->with(['asset.room', 'asset.category'])
+            ->when($user && ! UnitScope::bypasses($user) && $user->team_id, function ($query) use ($user) {
+                $query->whereHas('asset', fn ($asset) => $asset->where('team_id', $user->team_id));
+            })
             ->when($request->query('search'), function ($query, $search) {
                 $query->where(function ($q) use ($search) {
                     $q->where('purchase_number', 'like', "%{$search}%")
@@ -59,12 +65,16 @@ class PurchaseController extends Controller
             $proofPath = 'uploads/purchases/'.$name;
         }
 
-        $purchase = DB::transaction(function () use ($validated, $proofPath) {
+        $user = $request->user();
+
+        $purchase = DB::transaction(function () use ($validated, $proofPath, $user) {
             $asset = Asset::create([
                 'asset_code' => $this->nextAssetCode(),
                 'name' => $validated['name'],
                 'category_id' => $validated['category_id'] ?? null,
                 'room_id' => $validated['room_id'] ?? null,
+                // A purchase always belongs to the buyer's own unit.
+                'team_id' => UnitScope::resolveTeamId($user, null),
                 'purchase_price' => $validated['amount'],
                 'purchase_date' => $validated['purchase_date'],
                 'purchase_receipt' => $validated['invoice_number'],
@@ -93,8 +103,10 @@ class PurchaseController extends Controller
     /**
      * Display the specified purchase.
      */
-    public function show(Purchase $purchase): JsonResponse
+    public function show(Request $request, Purchase $purchase): JsonResponse
     {
+        UnitScope::assertAccess($request->user(), $purchase->asset?->team_id);
+
         return ApiResponse::success([
             'purchase' => new PurchaseResource($purchase->load(['asset.room', 'asset.category'])),
         ]);
@@ -105,6 +117,8 @@ class PurchaseController extends Controller
      */
     public function destroy(Request $request, Purchase $purchase): JsonResponse
     {
+        UnitScope::assertAccess($request->user(), $purchase->asset?->team_id);
+
         if ($purchase->proof_path) {
             $path = public_path($purchase->proof_path);
             if (File::exists($path)) {

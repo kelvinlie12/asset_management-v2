@@ -8,6 +8,7 @@ use App\Http\Requests\UpdateAssetRequest;
 use App\Http\Resources\AssetResource;
 use App\Models\Asset;
 use App\Support\ApiResponse;
+use App\Support\UnitScope;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\File;
@@ -32,34 +33,37 @@ class AssetController extends Controller
         $perPage = (int) $request->query('per_page', 15);
         $perPage = min(max($perPage, 1), 100);
 
-        $assets = Asset::query()
-            ->with(['room', 'category', 'team', 'assignedUser'])
-            ->when($request->query('search'), function ($query, $search) {
-                $query->where(function ($q) use ($search) {
-                    $q->where('asset_code', 'like', "%{$search}%")
-                        ->orWhere('name', 'like', "%{$search}%")
-                        ->orWhere('description', 'like', "%{$search}%");
-                });
-            })
-            ->when($request->query('condition'), function ($query, $condition) {
-                $query->where('condition', $condition);
-            })
-            ->when($request->query('usage_status'), function ($query, $usageStatus) {
-                $query->where('usage_status', $usageStatus);
-            })
-            ->when($request->query('category_id'), function ($query, $categoryId) {
-                $query->where('category_id', $categoryId);
-            })
-            ->when($request->query('room_id'), function ($query, $roomId) {
-                $query->where('room_id', $roomId);
-            })
-            ->when($request->query('team_id'), function ($query, $teamId) {
-                $query->where('team_id', $teamId);
-            })
-            ->when($request->query('assigned_user_id'), function ($query, $userId) {
-                $query->where('assigned_user_id', $userId);
-            })
-            ->orderBy('asset_code')
+        $assets = UnitScope::apply(
+            Asset::query()
+                ->with(['room', 'category', 'team', 'assignedUser'])
+                ->when($request->query('search'), function ($query, $search) {
+                    $query->where(function ($q) use ($search) {
+                        $q->where('asset_code', 'like', "%{$search}%")
+                            ->orWhere('name', 'like', "%{$search}%")
+                            ->orWhere('description', 'like', "%{$search}%");
+                    });
+                })
+                ->when($request->query('condition'), function ($query, $condition) {
+                    $query->where('condition', $condition);
+                })
+                ->when($request->query('usage_status'), function ($query, $usageStatus) {
+                    $query->where('usage_status', $usageStatus);
+                })
+                ->when($request->query('category_id'), function ($query, $categoryId) {
+                    $query->where('category_id', $categoryId);
+                })
+                ->when($request->query('room_id'), function ($query, $roomId) {
+                    $query->where('room_id', $roomId);
+                })
+                ->when($request->query('team_id'), function ($query, $teamId) {
+                    $query->where('team_id', $teamId);
+                })
+                ->when($request->query('assigned_user_id'), function ($query, $userId) {
+                    $query->where('assigned_user_id', $userId);
+                })
+                ->orderBy('asset_code'),
+            $request->user()
+        )
             ->paginate($perPage)
             ->withQueryString();
 
@@ -72,6 +76,7 @@ class AssetController extends Controller
     public function store(StoreAssetRequest $request): JsonResponse
     {
         $data = $request->validated();
+        $data['team_id'] = UnitScope::resolveTeamId($request->user(), $data['team_id'] ?? null);
 
         if ($request->hasFile('photo')) {
             $data['photo'] = $this->storeFile($request->file('photo'), 'uploads/assets/photos');
@@ -90,8 +95,10 @@ class AssetController extends Controller
     /**
      * Display the specified asset with its full history.
      */
-    public function show(Asset $asset): JsonResponse
+    public function show(Request $request, Asset $asset): JsonResponse
     {
+        UnitScope::assertAccess($request->user(), $asset->team_id);
+
         return ApiResponse::success([
             'asset' => new AssetResource($asset->load($this->relations())),
         ]);
@@ -102,7 +109,38 @@ class AssetController extends Controller
      */
     public function update(UpdateAssetRequest $request, Asset $asset): JsonResponse
     {
+        UnitScope::assertAccess($request->user(), $asset->team_id);
+
         $data = $request->validated();
+        if (! UnitScope::bypasses($request->user())) {
+            $data['team_id'] = $request->user()?->team_id ?: $asset->team_id;
+        }
+
+        // Network assets are managed by the FTTH module: they cannot be moved
+        // back to the warehouse, marked as damaged, or relocated via Asset Master.
+        if ($asset->hasNetworkNode()) {
+            if (($data['condition'] ?? null) === Asset::CONDITION_DAMAGED) {
+                return ApiResponse::error(
+                    'Aset yang terpasang sebagai node jaringan tidak boleh ditandai rusak (DAMAGED). Hapus node jaringan terlebih dahulu.',
+                    null,
+                    422,
+                );
+            }
+            if (($data['usage_status'] ?? null) === Asset::USAGE_IN_STORAGE) {
+                return ApiResponse::error(
+                    'Aset yang terpasang sebagai node jaringan tidak boleh dikembalikan ke gudang (IN_STORAGE) lewat Asset Master. Hapus node jaringan terlebih dahulu.',
+                    null,
+                    422,
+                );
+            }
+            if (array_key_exists('room_id', $data) && ! empty($data['room_id']) && (int) $data['room_id'] !== (int) $asset->networkNode->room_id) {
+                return ApiResponse::error(
+                    'Lokasi aset yang terpasang sebagai node jaringan mengikuti node (site). Pindahkan lewat modul Jaringan FTTH.',
+                    null,
+                    422,
+                );
+            }
+        }
 
         if ($request->hasFile('photo')) {
             $this->deleteFile($asset->photo);
@@ -125,6 +163,16 @@ class AssetController extends Controller
      */
     public function destroy(Request $request, Asset $asset): JsonResponse
     {
+        UnitScope::assertAccess($request->user(), $asset->team_id);
+
+        if ($asset->hasNetworkNode()) {
+            return ApiResponse::error(
+                'Aset ini terpasang sebagai node jaringan dan tidak dapat dihapus. Hapus node jaringan (Jaringan FTTH) terlebih dahulu.',
+                null,
+                422,
+            );
+        }
+
         $this->deleteFile($asset->photo);
         $this->deleteFile($asset->purchase_receipt);
 
@@ -147,6 +195,7 @@ class AssetController extends Controller
             'assignments',
             'transfers',
             'damages',
+            'networkNode',
         ];
     }
 

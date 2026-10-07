@@ -24,7 +24,7 @@ class UpdateAssetDamageRequest extends FormRequest
     {
         return [
             'damage_date' => ['required', 'date'],
-            'user_id' => ['nullable', Rule::exists('users', 'id')],
+            'user_id' => ['nullable', Rule::exists('users', 'id'), new UserBelongsToUnit($this->user())],
             'responsible_id' => ['nullable', Rule::exists('users', 'id')],
             'description' => ['required', 'string'],
             'photo' => ['nullable', 'image', 'max:5120'],

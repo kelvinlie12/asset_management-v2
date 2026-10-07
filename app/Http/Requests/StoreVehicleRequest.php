@@ -2,7 +2,10 @@
 
 namespace App\Http\Requests;
 
+use App\Rules\RoomBelongsToUnit;
+use App\Rules\UserBelongsToUnit;
 use App\Models\VehicleAsset;
+use App\Support\UnitScope;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
@@ -22,10 +25,14 @@ class StoreVehicleRequest extends FormRequest
      *
      * @return array<string, mixed>
      */
-    public function rules(): array
+public function rules(): array
     {
+        $owningTeamId = $this->owningTeamId();
+
         return [
-            'asset_code' => ['required', 'string', 'max:50', 'unique:vehicle_assets,asset_code'],
+            // Left nullable so the controller can fall back to nextVehicleCode(); a blank
+            // value still has to be unique, which `unique` enforces for non-null input.
+            'asset_code' => ['nullable', 'string', 'max:50', 'unique:vehicle_assets,asset_code'],
             'photo' => ['nullable', 'file', 'max:2048'],
             'brand' => ['required', 'string', 'max:255'],
             'model' => ['required', 'string', 'max:255'],
@@ -40,10 +47,30 @@ class StoreVehicleRequest extends FormRequest
             'condition' => ['required', Rule::in(VehicleAsset::CONDITIONS)],
             'usage_status' => ['required', Rule::in(VehicleAsset::USAGE_STATUSES)],
             'team_id' => ['nullable', Rule::exists('teams', 'id')],
-            'room_id' => ['nullable', Rule::exists('rooms', 'id')],
-            'assigned_user_id' => ['nullable', Rule::exists('users', 'id')],
+'room_id' => ['nullable', Rule::exists('rooms', 'id'), new RoomBelongsToUnit($this->user(), $owningTeamId)],
+            'assigned_user_id' => ['nullable', Rule::exists('users', 'id'), new UserBelongsToUnit($this->user(), $owningTeamId)],
             'supplier_id' => ['nullable', Rule::exists('suppliers', 'id')],
         ];
+    }
+
+    /**
+     * Unit that will own this vehicle.
+     *
+     * A unit-scoped user is pinned to their own unit by the controller, so their
+     * own unit wins over anything posted. A super admin chooses the unit, and the
+     * room and person they pick have to belong to that same unit.
+     */
+    private function owningTeamId(): int|string|null
+    {
+        $user = $this->user();
+
+        if ($user && ! UnitScope::bypasses($user) && $user->team_id) {
+            return $user->team_id;
+        }
+
+        $posted = $this->input('team_id');
+
+        return ($posted === null || $posted === '') ? null : $posted;
     }
 
     /**

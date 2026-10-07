@@ -16,7 +16,7 @@ class VehicleTaxReminderController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $result = VehicleTaxReminder::summarize();
+        $result = VehicleTaxReminder::summarize($request->user());
 
         return ApiResponse::success([
             'summary' => $result['summary'],

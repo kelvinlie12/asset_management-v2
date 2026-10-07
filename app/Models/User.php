@@ -2,12 +2,14 @@
 
 namespace App\Models;
 
+use App\Support\ModuleCatalog;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
+use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Traits\HasRoles;
 
 class User extends Authenticatable
@@ -17,12 +19,14 @@ class User extends Authenticatable
 
     public const ROLE_SUPER_ADMIN = 'super_admin';
     public const ROLE_ADMIN = 'admin';
+    public const ROLE_OWNER = 'owner';
     public const ROLE_STAFF = 'staff';
     public const ROLE_VIEWER = 'viewer';
 
     public const ROLES = [
         self::ROLE_SUPER_ADMIN,
         self::ROLE_ADMIN,
+        self::ROLE_OWNER,
         self::ROLE_STAFF,
         self::ROLE_VIEWER,
     ];
@@ -57,6 +61,13 @@ class User extends Authenticatable
             'users.create',
             'users.update',
             'users.delete',
+        ],
+        // Owners only receive the profile permissions from the role itself;
+        // every feature module is granted per user by a super admin.
+        self::ROLE_OWNER => [
+            'profile.view',
+            'profile.update',
+            'profile.password',
         ],
         self::ROLE_SUPER_ADMIN => [
             'profile.view',
@@ -114,14 +125,22 @@ class User extends Authenticatable
         return $this->role === self::ROLE_SUPER_ADMIN;
     }
 
+    /**
+     * Owner of a single unit: full control, but limited to their own unit.
+     */
+    public function isOwner(): bool
+    {
+        return $this->role === self::ROLE_OWNER;
+    }
+
     public function isAdmin(): bool
     {
-        return in_array($this->role, [self::ROLE_SUPER_ADMIN, self::ROLE_ADMIN], true);
+        return in_array($this->role, [self::ROLE_SUPER_ADMIN, self::ROLE_ADMIN, self::ROLE_OWNER], true);
     }
 
     public function isStaff(): bool
     {
-        return in_array($this->role, [self::ROLE_SUPER_ADMIN, self::ROLE_ADMIN, self::ROLE_STAFF], true);
+        return in_array($this->role, [self::ROLE_SUPER_ADMIN, self::ROLE_ADMIN, self::ROLE_OWNER, self::ROLE_STAFF], true);
     }
 
     /**
@@ -142,11 +161,22 @@ class User extends Authenticatable
     /**
      * List of permissions granted to the user through Spatie.
      *
+     * Super admins receive every permission that exists in the system, so a
+     * newly added permission is granted to them automatically.
+     *
      * @return list<string>
      */
     public function getRoleAbilities(): array
     {
-        return $this->getAllPermissions()->pluck('name')->toArray();
+        $assigned = $this->getAllPermissions()->pluck('name');
+
+        if ($this->isSuperAdmin()) {
+            $assigned = $assigned->merge(
+                Permission::query()->pluck('name')
+            );
+        }
+
+        return $assigned->unique()->values()->all();
     }
 
     /**
@@ -157,6 +187,52 @@ class User extends Authenticatable
     public function team(): BelongsTo
     {
         return $this->belongsTo(Team::class);
+    }
+
+    /**
+     * The module keys this user currently has access to.
+     *
+     * A module counts as granted when every permission in its bundle is part
+     * of the user's effective permission set. Super admins implicitly own
+     * every module, so the catalogue is returned untouched for them.
+     *
+     * @return list<string>
+     */
+    public function getModuleKeys(): array
+    {
+        if ($this->isSuperAdmin()) {
+            return ModuleCatalog::keys();
+        }
+
+        $effective = $this->getRoleAbilities();
+
+        return array_values(array_filter(
+            ModuleCatalog::keys(),
+            static function (string $key) use ($effective) {
+                foreach (ModuleCatalog::MODULES[$key]['permissions'] as $permission) {
+                    if (! in_array($permission, $effective, true)) {
+                        return false;
+                    }
+                }
+
+                return true;
+            }
+        ));
+    }
+
+    /**
+     * Replace this user's module grants with the given keys.
+     *
+     * @param  list<string>  $keys
+     */
+    public function syncModules(array $keys): void
+    {
+        $keys = ModuleCatalog::sanitizeKeys($keys);
+
+        $this->syncPermissions(ModuleCatalog::permissionsFor($keys));
+
+        $this->unsetRelation('permissions');
+        $this->unsetRelation('roles');
     }
 
     public function isActive(): bool

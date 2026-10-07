@@ -7,7 +7,7 @@ use App\Http\Requests\StoreAssetAssignmentRequest;
 use App\Http\Resources\AssetAssignmentResource;
 use App\Models\Asset;
 use App\Models\AssetAssignment;
-use App\Support\ApiResponse;
+use App\Support\UnitScope;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -23,8 +23,11 @@ class AssetAssignmentController extends Controller
         $perPage = (int) $request->query('per_page', 15);
         $perPage = min(max($perPage, 1), 100);
 
-        $assignments = AssetAssignment::query()
-            ->with(['asset.room', 'asset.category', 'team', 'room', 'assignedUser'])
+        $assignments = UnitScope::apply(
+            AssetAssignment::query(),
+            $request->user(),
+            'team_id'
+        )->with(['asset.room', 'asset.category', 'team', 'room', 'assignedUser'])
             ->when($request->query('search'), function ($query, $search) {
                 $query->where(function ($q) use ($search) {
                     $q->whereHas('asset', function ($asset) use ($search) {
@@ -56,6 +59,7 @@ class AssetAssignmentController extends Controller
         $validated = $request->validated();
 
         $asset = Asset::query()->findOrFail($validated['asset_id']);
+        UnitScope::assertAccess($request->user(), $asset->team_id);
         if ($asset->condition === Asset::CONDITION_DAMAGED) {
             throw ValidationException::withMessages([
                 'asset_id' => 'A damaged asset cannot be assigned to a user or room.',
@@ -92,8 +96,10 @@ class AssetAssignmentController extends Controller
     /**
      * Display the specified assignment history record.
      */
-    public function show(AssetAssignment $assetAssignment): JsonResponse
+    public function show(Request $request, AssetAssignment $assetAssignment): JsonResponse
     {
+        UnitScope::assertAccess($request->user(), $assetAssignment->team_id);
+
         return ApiResponse::success([
             'assignment' => new AssetAssignmentResource(
                 $assetAssignment->load(['asset.room', 'asset.category', 'asset.team', 'asset.assignedUser', 'team', 'room', 'assignedUser'])
