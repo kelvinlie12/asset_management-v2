@@ -14,7 +14,7 @@ return [
 
     'allowed_origins' => env('FRONTEND_URL')
         ? explode(',', env('FRONTEND_URL'))
-        : ['https://demo-asset.gti.my.id/'],
+        : ['https://asset.gti.my.id/'],
 
     'allowed_origins_patterns' => [],
 
