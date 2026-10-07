@@ -1,60 +1,60 @@
 <?php
 
-// return [
+return [
 
-//     /*
-//     |--------------------------------------------------------------------------
-//     | Cross-Origin Resource Sharing (CORS) Configuration
-//     |--------------------------------------------------------------------------
-//     */
+    /*
+    |--------------------------------------------------------------------------
+    | Cross-Origin Resource Sharing (CORS) Configuration
+    |--------------------------------------------------------------------------
+    */
 
-//     'paths' => ['api/*', 'sanctum/csrf-cookie'],
+    'paths' => ['api/*', 'sanctum/csrf-cookie'],
 
-//     'allowed_methods' => ['*'],
+    'allowed_methods' => ['*'],
 
-//     'allowed_origins' => env('FRONTEND_URL')
-//         ? explode(',', env('FRONTEND_URL'))
-//         : ['https://asset.gti.my.id/'],
+    'allowed_origins' => env('FRONTEND_URL')
+        ? explode(',', env('FRONTEND_URL'))
+        : ['https://asset.gti.my.id/'],
 
-//     'allowed_origins_patterns' => [],
+    'allowed_origins_patterns' => [],
 
-//    'allowed_headers' => ['*'],
+   'allowed_headers' => ['*'],
 
-//     'exposed_headers' => [],
+    'exposed_headers' => [],
 
-//     'max_age' => 0,
+    'max_age' => 0,
 
-//     'supports_credentials' => false,
+    'supports_credentials' => false,
 
-// ];
+];
 
 
- return [
+//  return [
 
-     'paths' => [
-         'api/*',
-         'sanctum/csrf-cookie',
-     ],
+//      'paths' => [
+//          'api/*',
+//          'sanctum/csrf-cookie',
+//      ],
 
-     'allowed_methods' => ['*'],
+//      'allowed_methods' => ['*'],
 
-     'allowed_origins' => [
-         'http://localhost:5173',
-         'http://127.0.0.1:5173',
-         'https://asset.gti.my.id',
-     ],
+//      'allowed_origins' => [
+//          'http://localhost:5173',
+//          'http://127.0.0.1:5173',
+//          'https://asset.gti.my.id',
+//      ],
 
-     'allowed_origins_patterns' => [],
+//      'allowed_origins_patterns' => [],
 
-     'allowed_headers' => ['*'],
+//      'allowed_headers' => ['*'],
 
-     'exposed_headers' => [],
+//      'exposed_headers' => [],
 
-     'max_age' => 0,
+//      'max_age' => 0,
 
-     'supports_credentials' => true,
+//      'supports_credentials' => true,
 
- ];
+//  ];
 
 
 
