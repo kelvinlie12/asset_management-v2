@@ -4,6 +4,8 @@ namespace Tests\Feature;
 
 use App\Models\Asset;
 use App\Models\Category;
+use App\Models\Purchase;
+use App\Models\Room;
 use App\Models\Team;
 use App\Models\User;
 use App\Support\ModuleCatalog;
@@ -429,5 +431,104 @@ class CategoryUnitTestScopeTest extends TestCase
 
         $this->assertContains('Milik A', $labels);
         $this->assertNotContains('Milik B', $labels);
+    }
+
+    public function test_dashboard_counters_are_scoped_to_the_users_unit(): void
+    {
+        $teamA = $this->team('Unit A');
+        $teamB = $this->team('Unit B');
+        $assetA = $this->assetFor($teamA, 'AST-A', null);
+        $assetB = $this->assetFor($teamB, 'AST-B', null);
+        $assetB2 = $this->assetFor($teamB, 'AST-B2', null);
+
+        User::factory()->create(['role' => User::ROLE_STAFF, 'team_id' => $teamB->id]);
+
+        Room::create(['name' => 'Gudang A', 'status' => Room::STATUS_ACTIVE, 'team_id' => $teamA->id]);
+        Room::create(['name' => 'Gudang B', 'status' => Room::STATUS_ACTIVE, 'team_id' => $teamB->id]);
+
+        Purchase::create([
+            'purchase_number' => 'PO-1',
+            'supplier' => 'Supplier A',
+            'invoice_number' => 'INV-1',
+            'purchase_date' => now(),
+            'amount' => 1000,
+            'asset_id' => $assetA->id,
+        ]);
+        Purchase::create([
+            'purchase_number' => 'PO-2',
+            'supplier' => 'Supplier B',
+            'invoice_number' => 'INV-2',
+            'purchase_date' => now(),
+            'amount' => 5000,
+            'asset_id' => $assetB->id,
+        ]);
+        Purchase::create([
+            'purchase_number' => 'PO-3',
+            'supplier' => 'Supplier B',
+            'invoice_number' => 'INV-3',
+            'purchase_date' => now(),
+            'amount' => 2000,
+            'asset_id' => $assetB2->id,
+        ]);
+
+        Sanctum::actingAs($this->userFor($teamA, User::ROLE_OWNER));
+
+        $json = $this->getJson('/api/v1/dashboard')->assertOk()->json('data');
+
+        $this->assertSame(1, $json['metrics']['total_assets']);
+        $this->assertSame(1, $json['metrics']['total_teams']);
+        $this->assertSame(1, $json['metrics']['total_users']);
+        $this->assertSame(1, $json['metrics']['total_rooms']);
+        $this->assertSame(
+            1,
+            array_sum(array_column($json['purchases_per_month'], 'count')),
+        );
+        $this->assertNotNull($json['unit']);
+        $this->assertSame($teamA->id, $json['unit']['id']);
+    }
+
+    public function test_super_admin_dashboard_keeps_global_metrics(): void
+    {
+        $teamA = $this->team('Unit A');
+        $teamB = $this->team('Unit B');
+        $assetA = $this->assetFor($teamA, 'AST-A', null);
+        $assetB = $this->assetFor($teamB, 'AST-B', null);
+
+        User::factory()->create(['role' => User::ROLE_STAFF, 'team_id' => $teamA->id]);
+        User::factory()->create(['role' => User::ROLE_STAFF, 'team_id' => $teamB->id]);
+
+        Room::create(['name' => 'Gudang A', 'status' => Room::STATUS_ACTIVE, 'team_id' => $teamA->id]);
+        Room::create(['name' => 'Gudang B', 'status' => Room::STATUS_ACTIVE, 'team_id' => $teamB->id]);
+
+        Purchase::create([
+            'purchase_number' => 'PO-1',
+            'supplier' => 'Supplier A',
+            'invoice_number' => 'INV-1',
+            'purchase_date' => now(),
+            'amount' => 1000,
+            'asset_id' => $assetA->id,
+        ]);
+        Purchase::create([
+            'purchase_number' => 'PO-2',
+            'supplier' => 'Supplier B',
+            'invoice_number' => 'INV-2',
+            'purchase_date' => now(),
+            'amount' => 5000,
+            'asset_id' => $assetB->id,
+        ]);
+
+        Sanctum::actingAs($this->superAdmin());
+
+        $json = $this->getJson('/api/v1/dashboard')->assertOk()->json('data');
+
+        $this->assertSame(2, $json['metrics']['total_assets']);
+        $this->assertSame(2, $json['metrics']['total_teams']);
+        $this->assertSame(3, $json['metrics']['total_users']);
+        $this->assertSame(2, $json['metrics']['total_rooms']);
+        $this->assertSame(
+            2,
+            array_sum(array_column($json['purchases_per_month'], 'count')),
+        );
+        $this->assertArrayHasKey('unit', $json);
     }
 }

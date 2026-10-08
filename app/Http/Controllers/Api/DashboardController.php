@@ -109,7 +109,15 @@ class DashboardController extends Controller
             ? "strftime('%Y-%m', purchase_date)"
             : "DATE_FORMAT(purchase_date, '%Y-%m')";
 
-        $purchasesPerMonth = Purchase::query()
+        // Purchases have no team_id column; they are scoped through their
+        // asset, mirroring PurchaseController so each unit only sees the
+        // transactions that touch its own assets.
+        $purchaseQuery = Purchase::query();
+        if (! $bypass && $user && $user->team_id) {
+            $purchaseQuery->whereHas('asset', fn ($asset) => $asset->where('team_id', $user->team_id));
+        }
+
+        $purchasesPerMonth = (clone $purchaseQuery)
             ->whereNotNull('purchase_date')
             ->select(DB::raw($monthExpression.' as month'), DB::raw('count(*) as count'), DB::raw('sum(amount) as total'))
             ->groupBy('month')
@@ -127,6 +135,17 @@ class DashboardController extends Controller
             ->values()
             ->all();
 
+        // Each unit gets its own dashboard: counters that exist per-team are
+        // scoped to the logged-in user's unit. Super admins keep the global
+        // numbers. A non-superadmin always belongs to exactly one unit, so
+        // total_teams becomes 1 instead of leaking the global count.
+        $totalUsers = UnitScope::apply(User::query(), $user)->count();
+        $totalRooms = UnitScope::apply(Room::query(), $user)->count();
+
+        $unit = $user && $user->team_id && $user->team
+            ? ['id' => $user->team->id, 'name' => $user->team->name, 'slug' => $user->team->slug]
+            : null;
+
         return ApiResponse::success([
             'metrics' => [
                 'total_assets' => $totalAssets,
@@ -134,10 +153,11 @@ class DashboardController extends Controller
                 'assets_in_storage' => $assetsInStorage,
                 'assets_damaged' => $assetsDamaged,
                 'total_asset_value' => round($totalAssetValue, 2),
-                'total_teams' => Team::count(),
-                'total_users' => User::count(),
-                'total_rooms' => Room::count(),
+                'total_teams' => $bypass || ! $user?->team_id ? Team::count() : 1,
+                'total_users' => $totalUsers,
+                'total_rooms' => $totalRooms,
             ],
+            'unit' => $unit,
             'tax_reminders' => [
                 'overdue' => $taxSummary['overdue'],
                 'due_today' => $taxSummary['due_today'],
