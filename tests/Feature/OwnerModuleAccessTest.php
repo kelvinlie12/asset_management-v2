@@ -67,15 +67,15 @@ class OwnerModuleAccessTest extends TestCase
         $this->assertFalse($owner->fresh()->can('assets.view'));
     }
 
-    public function test_default_owner_modules_are_asset_and_damage(): void
+    public function test_default_owner_modules_are_asset_damage_and_users(): void
     {
-        $this->assertSame(['assets', 'damages'], ModuleCatalog::DEFAULT_OWNER_MODULES);
+        $this->assertSame(['assets', 'damages', 'users'], ModuleCatalog::DEFAULT_OWNER_MODULES);
 
         $team = $this->team('Unit A');
         $owner = $this->ownerOf($team);
 
         $this->assertSame(
-            ['assets', 'damages'],
+            ['assets', 'damages', 'users'],
             $owner->fresh()->getModuleKeys()
         );
     }

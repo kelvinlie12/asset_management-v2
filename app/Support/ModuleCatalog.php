@@ -155,6 +155,8 @@ class ModuleCatalog
     public const DEFAULT_OWNER_MODULES = [
         'assets',
         'damages',
+        // Every company manages the staff of its own unit.
+        'users',
     ];
 
     /**

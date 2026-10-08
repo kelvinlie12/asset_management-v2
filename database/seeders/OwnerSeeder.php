@@ -43,7 +43,7 @@ class OwnerSeeder extends Seeder
                     ['AST-OWN-TKN-04', 'Kabel LAN Cat6 (roll)', 'CAT-IT', 1750000, 'GOOD', 'IN_STORAGE'],
                 ],
                 // Teknik: mengurus perangkat keras dan jaringan.
-                'modules' => ['assets', 'damages', 'network'],
+                'modules' => ['assets', 'damages', 'network', 'users'],
             ],
             [
                 'name' => 'Siti Rahma',
@@ -65,7 +65,7 @@ class OwnerSeeder extends Seeder
                     ['AST-OWN-OPR-04', 'Tangga Lipat 4 Meter', 'CAT-LAIN', 900000, 'DAMAGED', 'IN_STORAGE'],
                 ],
                 // Operasional: distribusi, mutasi barang, dan kendaraan.
-                'modules' => ['assets', 'damages', 'purchases', 'transfers', 'vehicles'],
+                'modules' => ['assets', 'damages', 'purchases', 'transfers', 'vehicles', 'users'],
             ],
             [
                 'name' => 'Andi Wijaya',
@@ -87,7 +87,7 @@ class OwnerSeeder extends Seeder
                     ['AST-OWN-KEU-04', 'Laptop Akuntansi', 'CAT-IT', 13200000, 'GOOD', 'IN_STORAGE'],
                 ],
                 // Keuangan: administrasi, pembelian, dan vendor.
-                'modules' => ['assets', 'damages', 'purchases', 'suppliers', 'categories'],
+                'modules' => ['assets', 'damages', 'purchases', 'suppliers', 'categories', 'users'],
             ],
         ];
 
