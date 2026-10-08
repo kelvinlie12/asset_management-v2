@@ -47,7 +47,9 @@ class DashboardController extends Controller
 
         $taxSummary = VehicleTaxReminder::summarize($user)['summary'];
 
-        $assetsByCategory = Category::query()
+        // Scoped to the user's unit the same way the counters above are, so a
+        // unit only ever sees the categories it owns and its own asset counts.
+        $assetsByCategory = UnitScope::apply(Category::query(), $user)
             ->whereHas('assets')
             ->withCount('assets')
             ->orderByDesc('assets_count')
@@ -102,9 +104,14 @@ class DashboardController extends Controller
         usort($assetsByTeam, fn ($a, $b) => $b['value'] <=> $a['value']);
         $assetsByTeam = array_values($assetsByTeam);
 
+        // DATE_FORMAT is MySQL-only; sqlite (the test driver) spells it strftime.
+        $monthExpression = DB::connection()->getDriverName() === 'sqlite'
+            ? "strftime('%Y-%m', purchase_date)"
+            : "DATE_FORMAT(purchase_date, '%Y-%m')";
+
         $purchasesPerMonth = Purchase::query()
             ->whereNotNull('purchase_date')
-            ->select(DB::raw("DATE_FORMAT(purchase_date, '%Y-%m') as month"), DB::raw('count(*) as count'), DB::raw('sum(amount) as total'))
+            ->select(DB::raw($monthExpression.' as month'), DB::raw('count(*) as count'), DB::raw('sum(amount) as total'))
             ->groupBy('month')
             ->orderBy('month')
             ->get()

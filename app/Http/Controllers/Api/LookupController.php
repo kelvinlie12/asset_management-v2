@@ -30,10 +30,13 @@ class LookupController extends Controller
         $user = $request->user();
         $unitScoped = ! UnitScope::bypasses($user) && $user?->team_id;
 
+        // team_id travels with the categories, rooms and people so a super admin's
+        // forms can keep every picker limited to the unit currently selected.
         $categories = Category::query()
             ->where('status', 'active')
+            ->when($unitScoped, fn ($q) => $q->where('team_id', $user->team_id))
             ->orderBy('name')
-            ->get(['id', 'name', 'code']);
+            ->get(['id', 'name', 'code', 'team_id']);
 
         // team_id travels with the rooms and people so a super admin's forms can
         // keep the placement pickers limited to the unit currently selected.

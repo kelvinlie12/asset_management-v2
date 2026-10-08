@@ -16,6 +16,9 @@ class CategoryResource extends JsonResource
     {
         return [
             'id' => $this->id,
+            // null = shared global category; otherwise the unit that owns this copy.
+            'team_id' => $this->team_id,
+            'team' => $this->whenLoaded('team'),
             'name' => $this->name,
             'code' => $this->code,
             'description' => $this->description,
