@@ -57,11 +57,18 @@ class User extends Authenticatable
     ];
 
     /**
-     * Permission map for each role.
+     * Default feature access seeded into a user when their role is assigned.
+     *
+     * A role is a job title only: it no longer carries any permission on the
+     * Spatie role itself. Instead, the preset below is materialised as the
+     * user's *direct* permissions (their Access Rights) at assignment time, so
+     * every grant is visible and editable per user. A super admin's elevated
+     * access comes from their identity (see the Gate::before hook), never from
+     * a stored grant.
      *
      * @var array<string, list<string>>
      */
-    public const ROLE_PERMISSIONS = [
+    public const ROLE_DEFAULT_ACCESS = [
         self::ROLE_VIEWER => [
             'profile.view',
             'profile.update',
@@ -71,6 +78,16 @@ class User extends Authenticatable
             'profile.view',
             'profile.update',
             'profile.password',
+            'teams.view',
+            'rooms.view',
+            'categories.view',
+            'assets.view',
+            'purchases.view',
+            'assignments.view',
+            'transfers.view',
+            'damages.view',
+            'vehicles.view',
+            'network.view',
         ],
         self::ROLE_ADMIN => [
             'profile.view',
@@ -80,9 +97,53 @@ class User extends Authenticatable
             'users.create',
             'users.update',
             'users.delete',
+            'teams.view',
+            'teams.create',
+            'teams.update',
+            'teams.delete',
+            'rooms.view',
+            'rooms.create',
+            'rooms.update',
+            'rooms.delete',
+            'categories.view',
+            'categories.create',
+            'categories.update',
+            'categories.delete',
+            'assets.view',
+            'assets.create',
+            'assets.update',
+            'assets.delete',
+            'purchases.view',
+            'purchases.create',
+            'purchases.delete',
+            'assignments.view',
+            'assignments.create',
+            'transfers.view',
+            'transfers.create',
+            'damages.view',
+            'damages.create',
+            'damages.update',
+            'damages.delete',
+            'vehicles.view',
+            'vehicles.create',
+            'vehicles.update',
+            'vehicles.delete',
+            'vehicle_taxes.view',
+            'vehicle_taxes.create',
+            'vehicle_taxes.update',
+            'vehicle_taxes.delete',
+            'suppliers.view',
+            'suppliers.create',
+            'suppliers.update',
+            'suppliers.delete',
+            'network.view',
+            'network.create',
+            'network.update',
+            'network.delete',
+            'audit_logs.view',
         ],
-        // Owners only receive the profile permissions from the role itself;
-        // every feature module is granted per user by a super admin.
+        // An owner starts with profile access only; the feature modules and
+        // granular access of their unit are handed out per user.
         self::ROLE_OWNER => [
             'profile.view',
             'profile.update',
@@ -92,11 +153,6 @@ class User extends Authenticatable
             'profile.view',
             'profile.update',
             'profile.password',
-            'users.view',
-            'users.create',
-            'users.update',
-            'users.delete',
-            'system.manage',
         ],
     ];
 
@@ -212,7 +268,11 @@ class User extends Authenticatable
     /**
      * Ensure the user's Spatie role matches the legacy `role` column.
      *
-     * Creates the Spatie role if it does not yet exist, then reassigns it.
+     * The Spatie role (the job title) carries no permissions of its own. When
+     * the user has not been given any access yet, the role's default preset is
+     * materialised as direct permissions so nobody is left locked out after the
+     * role/permission split. Access already customised through the Access
+     * Rights matrix is never overwritten.
      */
     public function syncRoleToSpatie(): void
     {
@@ -222,6 +282,30 @@ class User extends Authenticatable
         if (! $this->hasRole($roleName)) {
             $this->syncRoles([$role]);
         }
+
+        $this->applyDefaultAccessWhenUnset();
+    }
+
+    /**
+     * Seed the role's default access as direct grants if nothing is set yet.
+     *
+     * Once a user goes through the Access Rights matrix they always hold at
+     * least the mandatory profile permissions directly, so this only ever fires
+     * for a brand new or never-configured account.
+     */
+    private function applyDefaultAccessWhenUnset(): void
+    {
+        if ($this->permissions()->exists()) {
+            return;
+        }
+
+        $defaults = self::ROLE_DEFAULT_ACCESS[$this->role]
+            ?? self::ROLE_DEFAULT_ACCESS[self::ROLE_VIEWER];
+
+        $this->syncPermissions($defaults);
+
+        $this->unsetRelation('permissions');
+        $this->unsetRelation('roles');
     }
 
     /**
@@ -334,7 +418,12 @@ class User extends Authenticatable
     {
         $keys = ModuleCatalog::sanitizeKeys($keys);
 
-        $this->syncPermissions(ModuleCatalog::permissionsFor($keys));
+        // Profile access is mandatory and must survive every module reset now
+        // that roles no longer grant it.
+        $this->syncPermissions(array_values(array_unique(array_merge(
+            ModuleCatalog::permissionsFor($keys),
+            self::MANDATORY_PERMISSIONS,
+        ))));
 
         // A module preset supersedes any hand-tuned per-user overrides.
         if (! empty($this->denied_permissions)) {

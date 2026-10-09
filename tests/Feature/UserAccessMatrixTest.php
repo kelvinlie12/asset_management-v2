@@ -82,7 +82,8 @@ class UserAccessMatrixTest extends TestCase
         $team = $this->team('Unit A');
         $staff = $this->person($team);
 
-        // The staff role grants assets.view and damages.view by default.
+        // The staff role's default access seeds assets.view and damages.view as
+        // the user's own (direct) grants, independent of the job title.
         $this->assertTrue($staff->fresh()->can('assets.view'));
         $this->assertTrue($staff->fresh()->can('damages.view'));
 
@@ -98,7 +99,7 @@ class UserAccessMatrixTest extends TestCase
         $this->assertTrue($fresh->can('assets.view'));
         $this->assertTrue($fresh->can('users.view'));
 
-        // Revoked even though the role still carries it.
+        // Revoked, because access is now driven by the Access Rights matrix.
         $this->assertFalse($fresh->can('damages.view'));
         $this->assertFalse($fresh->can('assets.create'));
     }
@@ -143,29 +144,30 @@ class UserAccessMatrixTest extends TestCase
         $this->assertFalse($userB->fresh()->can('assets.view'));
     }
 
-    public function test_permissions_outside_the_actors_ceiling_are_left_untouched(): void
+    public function test_owner_grants_unit_features_but_not_system_permissions(): void
     {
         $team = $this->team('Unit A');
         $staff = $this->person($team);
 
-        // Staff starts with rooms.view from its role; the owner has no rooms
-        // module, so they cannot touch that permission.
+        // The staff role's default access grants rooms.view.
         $this->assertTrue($staff->fresh()->can('rooms.view'));
 
         Sanctum::actingAs($this->ownerOf($team));
 
-        // suppliers.view belongs to no role the staff holds and the owner has no
-        // suppliers module either, so the owner cannot grant it.
+        // suppliers.view lives in the owner's unit catalogue, so it is granted
+        // even though the actor does not personally hold it. roles.view belongs
+        // to the system group an owner may not hand out, so it is ignored.
         $this->putJson("/api/v1/users/{$staff->id}/access", [
-            'permissions' => ['suppliers.view'],
+            'permissions' => ['suppliers.view', 'roles.view'],
         ])->assertOk();
 
         $fresh = $staff->fresh();
 
-        // suppliers.view is outside the owner's ceiling and must be ignored.
-        $this->assertFalse($fresh->can('suppliers.view'));
-        // rooms.view is outside the owner's ceiling and must be preserved.
-        $this->assertTrue($fresh->can('rooms.view'));
+        $this->assertTrue($fresh->can('suppliers.view'));
+        $this->assertFalse($fresh->can('roles.view'));
+        // rooms.view is inside the owner's catalogue and was not selected, so
+        // it is revoked.
+        $this->assertFalse($fresh->can('rooms.view'));
     }
 
     public function test_owner_cannot_manage_a_user_from_another_unit(): void

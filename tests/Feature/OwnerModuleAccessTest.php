@@ -58,9 +58,9 @@ class OwnerModuleAccessTest extends TestCase
 
         $owner = $this->ownerOf($team);
 
-        // The role itself carries profile access only, so a fresh owner can
-        // reach nothing until a super admin picks modules for them.
-        $owner->syncPermissions([]);
+        // The job title carries no feature access: a fresh owner can reach
+        // nothing but their own profile until access is granted per user.
+        $owner->syncPermissions(User::MANDATORY_PERMISSIONS);
 
         $this->assertSame([], $owner->fresh()->getModuleKeys());
         $this->assertTrue($owner->fresh()->can('profile.view'));

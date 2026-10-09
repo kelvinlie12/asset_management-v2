@@ -300,9 +300,31 @@ class UserController extends Controller
             'catalog' => AccessCatalog::toArray(),
             'actions' => AccessCatalog::ACTIONS,
             'permissions' => $user->getRoleAbilities(),
-            'grantable' => $actor->getRoleAbilities(),
+            'grantable' => $this->grantablePermissions($actor),
             'editable' => $actor->can('manageAccess', $user),
         ]);
+    }
+
+    /**
+     * The feature permissions the acting user may hand out.
+     *
+     * A super admin can grant anything. A unit owner administers the whole
+     * catalogue of their unit except the `system` group. Anyone else is capped
+     * at what they hold themselves, so nobody grants more than they have.
+     *
+     * @return list<string>
+     */
+    private function grantablePermissions(User $actor): array
+    {
+        if ($actor->isSuperAdmin()) {
+            return AccessCatalog::permissionNames();
+        }
+
+        if ($actor->isOwner()) {
+            return AccessCatalog::permissionNamesExceptSystem();
+        }
+
+        return $actor->getRoleAbilities();
     }
 
     /**
@@ -321,7 +343,7 @@ class UserController extends Controller
         $desired = $request->permissionNames();
 
         if (! $actor->isSuperAdmin()) {
-            $grantable = $actor->getRoleAbilities();
+            $grantable = $this->grantablePermissions($actor);
             $untouchable = array_values(array_diff($user->getRoleAbilities(), $grantable));
 
             $desired = array_values(array_unique(array_merge(

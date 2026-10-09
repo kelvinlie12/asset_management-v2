@@ -178,48 +178,39 @@ class RolePermissionSeeder extends Seeder
             'network.delete',
             'audit_logs.view',
         ],
-        // Unit owner: profile access only. Feature modules are granted per
-        // user (see ModuleCatalog) so each owner sees a different menu.
-        User::ROLE_OWNER => [
-            'profile.view',
-            'profile.update',
-            'profile.password',
-        ],
-        User::ROLE_SUPER_ADMIN => self::PERMISSIONS,
     ];
 
     public function run(): void
     {
         // Use firstOrCreate (bypasses the Spatie registrar cache) so the seeder
         // stays idempotent even when the cached permission snapshot is stale.
-        $permissionModels = collect(self::PERMISSIONS)->mapWithKeys(
-            fn (string $name) => [$name => Permission::firstOrCreate(
-                ['name' => $name, 'guard_name' => self::GUARD],
-                ['name' => $name, 'guard_name' => self::GUARD],
-            )]
-        );
+        collect(self::PERMISSIONS)->each(fn (string $name) => Permission::firstOrCreate(
+            ['name' => $name, 'guard_name' => self::GUARD],
+            ['name' => $name, 'guard_name' => self::GUARD],
+        ));
 
-        foreach (self::ROLE_PERMISSIONS as $roleName => $rolePermissionNames) {
-            $role = Role::findOrCreate($roleName, self::GUARD);
-            $role->permissions()->sync(
-                $permissionModels->only($rolePermissionNames)->map->id->values()->all()
-            );
+        // A role is a job title only: it must not carry any permission itself.
+        foreach (User::ROLES as $roleName) {
+            Role::findOrCreate($roleName, self::GUARD)->permissions()->sync([]);
         }
 
-        // Ensure legacy users are linked to a matching Spatie role.
+        // Ensure legacy users are linked to a matching Spatie role and have
+        // their role's default access materialised as direct grants (safe: an
+        // already customised matrix is left untouched).
         User::query()->each(function (User $user) {
             $user->syncRoleToSpatie();
         });
 
-        // Trimming the owner role down to profile permissions would otherwise
-        // strip the menu of any owner who was configured by hand instead of by
-        // OwnerSeeder. Owners with no module grants of their own fall back to
-        // the default set; a super admin can still clear it from the UI.
+        // Owners whose access is still empty fall back to the default module
+        // set; a super admin can still widen or clear it from the UI.
         User::query()
             ->where('role', User::ROLE_OWNER)
-            ->whereDoesntHave('permissions')
             ->each(function (User $user) {
-                $user->syncModules(ModuleCatalog::DEFAULT_OWNER_MODULES);
+                $features = array_diff($user->getRoleAbilities(), User::MANDATORY_PERMISSIONS);
+
+                if (empty($features)) {
+                    $user->syncModules(ModuleCatalog::DEFAULT_OWNER_MODULES);
+                }
             });
 
         // Drop the cached snapshot so subsequent lookups see the current rows.

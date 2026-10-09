@@ -239,6 +239,33 @@ class AccessCatalog
     }
 
     /**
+     * Feature permissions a unit owner may hand out.
+     *
+     * The `system` group (roles, permissions, audit log) is reserved for a
+     * super admin, so an owner manages everything else in their own unit.
+     *
+     * @return list<string>
+     */
+    public static function permissionNamesExceptSystem(): array
+    {
+        $names = [];
+
+        foreach (self::GROUPS as $group) {
+            if ($group['key'] === 'system') {
+                continue;
+            }
+
+            foreach ($group['features'] as $feature) {
+                foreach ($feature['actions'] as $permission) {
+                    $names[$permission] = true;
+                }
+            }
+        }
+
+        return array_keys($names);
+    }
+
+    /**
      * Keep only the permissions this catalogue knows how to grant.
      *
      * @param  list<string>  $permissions
