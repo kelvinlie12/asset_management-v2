@@ -107,6 +107,8 @@ class RolePermissionSeeder extends Seeder
     private const ROLE_PERMISSIONS = [
         User::ROLE_VIEWER => [
             'profile.view',
+            'profile.update',
+            'profile.password',
         ],
         User::ROLE_STAFF => [
             'profile.view',

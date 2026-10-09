@@ -47,6 +47,8 @@ class User extends Authenticatable
     public const ROLE_PERMISSIONS = [
         self::ROLE_VIEWER => [
             'profile.view',
+            'profile.update',
+            'profile.password',
         ],
         self::ROLE_STAFF => [
             'profile.view',
