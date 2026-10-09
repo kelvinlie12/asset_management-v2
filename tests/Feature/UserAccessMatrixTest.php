@@ -144,7 +144,7 @@ class UserAccessMatrixTest extends TestCase
         $this->assertFalse($userB->fresh()->can('assets.view'));
     }
 
-    public function test_owner_grants_the_programmed_modules_but_not_role_admin(): void
+    public function test_owner_grants_within_the_modules_they_were_given(): void
     {
         $team = $this->team('Unit A');
         $staff = $this->person($team);
@@ -154,22 +154,35 @@ class UserAccessMatrixTest extends TestCase
 
         Sanctum::actingAs($this->ownerOf($team));
 
-        // Every module the programmer defined is grantable: suppliers.view is
-        // given even though the actor does not personally hold it, and so is
-        // audit_logs.view. Managing the roles/permissions RBAC stays with a
-        // super admin, so those are ignored.
+        // The owner of a unit starts from the modules a super admin hands
+        // them (assets, damages, users). Everything inside those modules can
+        // be passed down; a module they were never given - suppliers, audit
+        // logs - and the role/permission RBAC stay out of reach.
         $this->putJson("/api/v1/users/{$staff->id}/access", [
-            'permissions' => ['suppliers.view', 'audit_logs.view', 'roles.view', 'permissions.create'],
+            'permissions' => [
+                'assets.delete',    // assets module the owner holds
+                'damages.create',   // damages module the owner holds
+                'users.delete',     // users module the owner holds
+                'suppliers.view',   // module not given to the owner
+                'audit_logs.view',  // module not given to the owner
+                'roles.view',       // role admin reserved for a super admin
+            ],
         ])->assertOk();
 
         $fresh = $staff->fresh();
 
-        $this->assertTrue($fresh->can('suppliers.view'));
-        $this->assertTrue($fresh->can('audit_logs.view'));
+        $this->assertTrue($fresh->can('assets.delete'));
+        $this->assertTrue($fresh->can('damages.create'));
+        $this->assertTrue($fresh->can('users.delete'));
+        $this->assertFalse($fresh->can('suppliers.view'));
+        $this->assertFalse($fresh->can('audit_logs.view'));
         $this->assertFalse($fresh->can('roles.view'));
-        $this->assertFalse($fresh->can('permissions.create'));
-        // rooms.view was not selected, so it is revoked.
-        $this->assertFalse($fresh->can('rooms.view'));
+
+        // assets.view was held but dropped from the matrix, so it is revoked.
+        $this->assertFalse($fresh->can('assets.view'));
+
+        // rooms.view sits outside the owner's modules, so it is left alone.
+        $this->assertTrue($fresh->can('rooms.view'));
     }
 
     public function test_owner_cannot_manage_a_user_from_another_unit(): void

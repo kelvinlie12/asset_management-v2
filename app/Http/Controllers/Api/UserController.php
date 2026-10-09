@@ -308,10 +308,10 @@ class UserController extends Controller
     /**
      * The feature permissions the acting user may hand out.
      *
-     * A super admin can grant anything. A unit owner administers every module
-     * the programme defines except the role/permission management itself, so
-     * they can give their staff any access their work needs. Anyone else is
-     * capped at what they hold themselves.
+     * A super admin can grant anything. A unit owner distributes exactly the
+     * modules a super admin entrusted to them, so their staff can only ever
+     * reach what the owner has been given. Anyone else is capped at what they
+     * hold themselves.
      *
      * @return list<string>
      */
@@ -322,7 +322,7 @@ class UserController extends Controller
         }
 
         if ($actor->isOwner()) {
-            return AccessCatalog::ownerGrantableNames();
+            return AccessCatalog::grantablesForHeldModules($actor->getRoleAbilities());
         }
 
         return $actor->getRoleAbilities();
