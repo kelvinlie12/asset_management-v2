@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\AccessCatalog;
 use App\Support\ModuleCatalog;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -9,13 +10,29 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
+use Spatie\Permission\Contracts\Permission as PermissionContract;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Traits\HasRoles;
 
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
-    use HasApiTokens, HasFactory, HasRoles, Notifiable;
+    use HasApiTokens, HasFactory, HasRoles, Notifiable {
+        // Keep the Spatie implementation reachable while a denied-permission
+        // guard is layered on top of it.
+        hasPermissionTo as protected spatieHasPermissionTo;
+    }
+
+    /**
+     * Permissions that can never be revoked from a user.
+     *
+     * @var list<string>
+     */
+    public const MANDATORY_PERMISSIONS = [
+        'profile.view',
+        'profile.update',
+        'profile.password',
+    ];
 
     public const ROLE_SUPER_ADMIN = 'super_admin';
     public const ROLE_ADMIN = 'admin';
@@ -97,6 +114,7 @@ class User extends Authenticatable
         'phone',
         'team_id',
         'status',
+        'denied_permissions',
     ];
 
     /**
@@ -119,7 +137,53 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'denied_permissions' => 'array',
         ];
+    }
+
+    /**
+     * Resolve the permission name behind a Spatie permission argument.
+     */
+    private function resolvePermissionName(mixed $permission): ?string
+    {
+        if ($permission instanceof PermissionContract) {
+            return $permission->name;
+        }
+
+        return is_string($permission) ? $permission : null;
+    }
+
+    /**
+     * Whether the permission has been explicitly revoked for this user.
+     */
+    public function isPermissionDenied(mixed $permission): bool
+    {
+        $name = $this->resolvePermissionName($permission);
+
+        if ($name === null) {
+            return false;
+        }
+
+        return in_array($name, $this->denied_permissions ?? [], true);
+    }
+
+    /**
+     * Permission checks honour the per-user deny list.
+     *
+     * Spatie has no concept of a negative grant, so a permission taken away
+     * from an individual user (while their role still grants it) is stored in
+     * `denied_permissions` and subtracted here. The Gate, the `permission:`
+     * middleware and `can()` all funnel through this method.
+     *
+     * @param  string|int|\Spatie\Permission\Contracts\Permission|\BackedEnum  $permission
+     */
+    public function hasPermissionTo($permission, $guardName = null): bool
+    {
+        if ($this->isPermissionDenied($permission)) {
+            return false;
+        }
+
+        return $this->spatieHasPermissionTo($permission, $guardName);
     }
 
     public function isSuperAdmin(): bool
@@ -173,12 +237,51 @@ class User extends Authenticatable
         $assigned = $this->getAllPermissions()->pluck('name');
 
         if ($this->isSuperAdmin()) {
-            $assigned = $assigned->merge(
-                Permission::query()->pluck('name')
-            );
+            // A super admin bypasses every check, so denials never apply.
+            return $assigned->merge(Permission::query()->pluck('name'))
+                ->unique()
+                ->values()
+                ->all();
         }
 
-        return $assigned->unique()->values()->all();
+        $denied = $this->denied_permissions ?? [];
+
+        return $assigned
+            ->unique()
+            ->reject(static fn (string $name) => in_array($name, $denied, true))
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Apply a granular permission set to this user.
+     *
+     * The resulting permission set is independent from the user's role: every
+     * permission the role already hands out but that is missing from the
+     * desired set is recorded as denied, and every desired permission the role
+     * does not provide is granted directly. This is what lets User A and User B
+     * of the same role hold different access inside one unit.
+     *
+     * @param  list<string>  $permissions
+     */
+    public function syncAccessPermissions(array $permissions): void
+    {
+        $permissions = AccessCatalog::sanitize($permissions);
+        $permissions = array_values(array_unique(array_merge(
+            $permissions,
+            self::MANDATORY_PERMISSIONS,
+        )));
+
+        $rolePermissions = $this->getPermissionsViaRoles()->pluck('name')->all();
+
+        $direct = array_values(array_diff($permissions, $rolePermissions));
+        $denied = array_values(array_diff($rolePermissions, $permissions));
+
+        $this->syncPermissions($direct);
+        $this->forceFill(['denied_permissions' => $denied])->save();
+
+        $this->unsetRelation('permissions');
+        $this->unsetRelation('roles');
     }
 
     /**
@@ -232,6 +335,11 @@ class User extends Authenticatable
         $keys = ModuleCatalog::sanitizeKeys($keys);
 
         $this->syncPermissions(ModuleCatalog::permissionsFor($keys));
+
+        // A module preset supersedes any hand-tuned per-user overrides.
+        if (! empty($this->denied_permissions)) {
+            $this->forceFill(['denied_permissions' => []])->save();
+        }
 
         $this->unsetRelation('permissions');
         $this->unsetRelation('roles');

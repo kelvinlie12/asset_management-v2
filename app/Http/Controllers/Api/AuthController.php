@@ -75,6 +75,7 @@ class AuthController extends Controller
         $validated = $request->validate([
             'name' => ['sometimes', 'string', 'max:255'],
             'email' => ['sometimes', 'string', 'email', 'max:255', 'unique:users,email,'.$user->id],
+            'phone' => ['sometimes', 'nullable', 'string', 'max:30'],
             'avatar' => ['sometimes', 'nullable', 'image', 'mimes:jpeg,png,jpg,webp,gif', 'max:4096'],
         ]);
 
@@ -82,6 +83,10 @@ class AuthController extends Controller
             'name' => $validated['name'] ?? $user->name,
             'email' => $validated['email'] ?? $user->email,
         ];
+
+        if (array_key_exists('phone', $validated)) {
+            $data['phone'] = $validated['phone'];
+        }
 
         if ($request->hasFile('avatar')) {
             $this->deleteAvatar($user->avatar);

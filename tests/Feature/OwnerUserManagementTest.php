@@ -71,17 +71,33 @@ class OwnerUserManagementTest extends TestCase
         $this->assertSame(User::STATUS_INACTIVE, $viewer->fresh()->status);
     }
 
-    public function test_owner_cannot_edit_owner_admin_superadmin_or_self(): void
+    public function test_owner_edits_admins_in_own_unit(): void
     {
         $team = $this->team('Unit A');
         $admin = User::factory()->create(['role' => User::ROLE_ADMIN, 'team_id' => $team->id]);
+
+        Sanctum::actingAs($this->ownerFor($team));
+
+        $this->putJson("/api/v1/users/{$admin->id}", [
+            'name' => 'Admin Baru',
+            'email' => $admin->email,
+            'role' => User::ROLE_ADMIN,
+            'status' => User::STATUS_ACTIVE,
+        ])->assertOk();
+
+        $this->assertSame('Admin Baru', $admin->fresh()->name);
+        $this->assertSame($team->id, $admin->fresh()->team_id);
+    }
+
+    public function test_owner_cannot_edit_owner_superadmin_or_self(): void
+    {
+        $team = $this->team('Unit A');
         $peer = $this->ownerFor($team);
         $super = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN, 'team_id' => null]);
         $acting = $this->ownerFor($team);
 
         Sanctum::actingAs($acting);
 
-        $this->putJson("/api/v1/users/{$admin->id}", ['name' => 'x'])->assertForbidden();
         $this->putJson("/api/v1/users/{$peer->id}", ['name' => 'x'])->assertForbidden();
         $this->putJson("/api/v1/users/{$super->id}", ['name' => 'x'])->assertForbidden();
         $this->putJson("/api/v1/users/{$acting->id}", ['name' => 'x'])->assertForbidden();

@@ -1,0 +1,263 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\Team;
+use App\Models\User;
+use App\Support\ModuleCatalog;
+use Database\Seeders\RolePermissionSeeder;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Laravel\Sanctum\Sanctum;
+use Tests\TestCase;
+
+class UserAccessMatrixTest extends TestCase
+{
+    use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->seed(RolePermissionSeeder::class);
+    }
+
+    private function team(string $name): Team
+    {
+        return Team::create([
+            'name' => $name,
+            'slug' => str($name)->slug(),
+        ]);
+    }
+
+    private function ownerOf(Team $team): User
+    {
+        $user = User::factory()->create(['role' => User::ROLE_OWNER, 'team_id' => $team->id]);
+        $user->syncRoleToSpatie();
+        $user->syncModules(ModuleCatalog::DEFAULT_OWNER_MODULES);
+
+        return $user;
+    }
+
+    private function adminOf(Team $team): User
+    {
+        $user = User::factory()->create(['role' => User::ROLE_ADMIN, 'team_id' => $team->id]);
+        $user->syncRoleToSpatie();
+
+        return $user;
+    }
+
+    private function person(Team $team, string $role = User::ROLE_STAFF): User
+    {
+        $user = User::factory()->create(['role' => $role, 'team_id' => $team->id]);
+        $user->syncRoleToSpatie();
+
+        return $user;
+    }
+
+    private function superAdmin(): User
+    {
+        $user = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN, 'team_id' => null]);
+        $user->syncRoleToSpatie();
+
+        return $user;
+    }
+
+    public function test_owner_can_read_the_access_matrix_of_a_member_of_their_unit(): void
+    {
+        $team = $this->team('Unit A');
+        $staff = $this->person($team);
+
+        Sanctum::actingAs($this->ownerOf($team));
+
+        $response = $this->getJson("/api/v1/users/{$staff->id}/access")->assertOk();
+
+        $response->assertJsonPath('data.target.id', $staff->id)
+            ->assertJsonPath('data.editable', true);
+
+        $this->assertNotEmpty($response->json('data.catalog'));
+        $this->assertSame('assets.view', $response->json('data.catalog.0.features.0.actions.view'));
+    }
+
+    public function test_owner_can_set_a_granular_access_matrix_independent_of_role(): void
+    {
+        $team = $this->team('Unit A');
+        $staff = $this->person($team);
+
+        // The staff role grants assets.view and damages.view by default.
+        $this->assertTrue($staff->fresh()->can('assets.view'));
+        $this->assertTrue($staff->fresh()->can('damages.view'));
+
+        Sanctum::actingAs($this->ownerOf($team));
+
+        $this->putJson("/api/v1/users/{$staff->id}/access", [
+            'permissions' => ['assets.view', 'users.view'],
+        ])->assertOk();
+
+        $fresh = $staff->fresh();
+
+        // Granted directly, even though the staff role never had users.view.
+        $this->assertTrue($fresh->can('assets.view'));
+        $this->assertTrue($fresh->can('users.view'));
+
+        // Revoked even though the role still carries it.
+        $this->assertFalse($fresh->can('damages.view'));
+        $this->assertFalse($fresh->can('assets.create'));
+    }
+
+    public function test_revocation_is_enforced_by_the_api_middleware(): void
+    {
+        $team = $this->team('Unit A');
+        $staff = $this->person($team);
+
+        Sanctum::actingAs($this->ownerOf($team));
+
+        $this->putJson("/api/v1/users/{$staff->id}/access", [
+            'permissions' => ['users.view'],
+        ])->assertOk();
+
+        Sanctum::actingAs($staff->fresh());
+
+        $this->getJson('/api/v1/users')->assertOk();
+        $this->getJson('/api/v1/assets')->assertForbidden();
+        $this->getJson('/api/v1/damages')->assertForbidden();
+    }
+
+    public function test_two_users_of_the_same_role_can_differ(): void
+    {
+        $team = $this->team('Unit A');
+        $userA = $this->person($team);
+        $userB = $this->person($team);
+
+        Sanctum::actingAs($this->ownerOf($team));
+
+        $this->putJson("/api/v1/users/{$userA->id}/access", [
+            'permissions' => ['assets.view'],
+        ])->assertOk();
+        $this->putJson("/api/v1/users/{$userB->id}/access", [
+            'permissions' => ['damages.view'],
+        ])->assertOk();
+
+        $this->assertTrue($userA->fresh()->can('assets.view'));
+        $this->assertFalse($userA->fresh()->can('damages.view'));
+
+        $this->assertTrue($userB->fresh()->can('damages.view'));
+        $this->assertFalse($userB->fresh()->can('assets.view'));
+    }
+
+    public function test_permissions_outside_the_actors_ceiling_are_left_untouched(): void
+    {
+        $team = $this->team('Unit A');
+        $staff = $this->person($team);
+
+        // Staff starts with rooms.view from its role; the owner has no rooms
+        // module, so they cannot touch that permission.
+        $this->assertTrue($staff->fresh()->can('rooms.view'));
+
+        Sanctum::actingAs($this->ownerOf($team));
+
+        // suppliers.view belongs to no role the staff holds and the owner has no
+        // suppliers module either, so the owner cannot grant it.
+        $this->putJson("/api/v1/users/{$staff->id}/access", [
+            'permissions' => ['suppliers.view'],
+        ])->assertOk();
+
+        $fresh = $staff->fresh();
+
+        // suppliers.view is outside the owner's ceiling and must be ignored.
+        $this->assertFalse($fresh->can('suppliers.view'));
+        // rooms.view is outside the owner's ceiling and must be preserved.
+        $this->assertTrue($fresh->can('rooms.view'));
+    }
+
+    public function test_owner_cannot_manage_a_user_from_another_unit(): void
+    {
+        $teamA = $this->team('Unit A');
+        $teamB = $this->team('Unit B');
+        $stranger = $this->person($teamB);
+
+        Sanctum::actingAs($this->ownerOf($teamA));
+
+        $this->getJson("/api/v1/users/{$stranger->id}/access")->assertForbidden();
+        $this->putJson("/api/v1/users/{$stranger->id}/access", [
+            'permissions' => ['assets.view'],
+        ])->assertForbidden();
+    }
+
+    public function test_owner_cannot_manage_a_super_admin_or_themselves(): void
+    {
+        $team = $this->team('Unit A');
+        $owner = $this->ownerOf($team);
+        $super = $this->superAdmin();
+
+        Sanctum::actingAs($owner);
+
+        $this->putJson("/api/v1/users/{$super->id}/access", [
+            'permissions' => ['assets.view'],
+        ])->assertForbidden();
+
+        $this->putJson("/api/v1/users/{$owner->id}/access", [
+            'permissions' => ['assets.view'],
+        ])->assertForbidden();
+    }
+
+    public function test_admin_manages_staff_and_viewer_but_not_another_admin(): void
+    {
+        $team = $this->team('Unit A');
+        $admin = $this->adminOf($team);
+        $staff = $this->person($team);
+        $peer = $this->adminOf($team);
+        $viewer = $this->person($team, User::ROLE_VIEWER);
+
+        Sanctum::actingAs($admin);
+
+        $this->putJson("/api/v1/users/{$staff->id}/access", [
+            'permissions' => ['assets.view'],
+        ])->assertOk();
+        $this->putJson("/api/v1/users/{$viewer->id}/access", [
+            'permissions' => ['assets.view'],
+        ])->assertOk();
+        $this->putJson("/api/v1/users/{$peer->id}/access", [
+            'permissions' => ['assets.view'],
+        ])->assertForbidden();
+    }
+
+    public function test_super_admin_can_set_access_for_any_unit(): void
+    {
+        $team = $this->team('Unit A');
+        $staff = $this->person($team);
+
+        Sanctum::actingAs($this->superAdmin());
+
+        // Even a permission the actor's own role does not enumerate is honoured.
+        $this->putJson("/api/v1/users/{$staff->id}/access", [
+            'permissions' => ['network.view', 'network.create'],
+        ])->assertOk();
+
+        $this->assertTrue($staff->fresh()->can('network.view'));
+        $this->assertTrue($staff->fresh()->can('network.create'));
+        $this->assertFalse($staff->fresh()->can('assets.view'));
+    }
+
+    public function test_unknown_permissions_are_rejected(): void
+    {
+        $team = $this->team('Unit A');
+        $staff = $this->person($team);
+
+        Sanctum::actingAs($this->ownerOf($team));
+
+        $this->putJson("/api/v1/users/{$staff->id}/access", [
+            'permissions' => ['assets.view', 'not.a.permission'],
+        ])->assertStatus(422);
+    }
+
+    public function test_access_matrix_does_not_expose_super_admin_editing(): void
+    {
+        $team = $this->team('Unit A');
+        $super = $this->superAdmin();
+        $owner = $this->ownerOf($team);
+
+        Sanctum::actingAs($owner);
+
+        // The owner cannot even open the matrix of a super admin.
+        $this->getJson("/api/v1/users/{$super->id}/access")->assertForbidden();
+    }
+}

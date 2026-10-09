@@ -122,19 +122,57 @@ class UserRoleAssignmentTest extends TestCase
         $this->assertDatabaseMissing('users', ['email' => 'new.person@example.com']);
     }
 
-    public function test_owner_cannot_create_an_owner_or_an_admin(): void
+    public function test_owner_cannot_create_an_owner(): void
     {
         $team = $this->team('Unit A', 'unit-a');
         Sanctum::actingAs($this->ownerWithUserManagement($team));
 
-        foreach ([User::ROLE_OWNER, User::ROLE_ADMIN] as $role) {
-            $this->postJson('/api/v1/users', $this->payload([
-                'role' => $role,
-                'email' => "escalate.{$role}@example.com",
-            ]))->assertForbidden();
+        $this->postJson('/api/v1/users', $this->payload([
+            'role' => User::ROLE_OWNER,
+        ]))->assertForbidden();
 
-            $this->assertDatabaseMissing('users', ['email' => "escalate.{$role}@example.com"]);
-        }
+        $this->assertDatabaseMissing('users', ['email' => 'new.person@example.com']);
+    }
+
+    public function test_owner_can_create_an_admin_in_their_own_unit(): void
+    {
+        $team = $this->team('Unit A', 'unit-a');
+        Sanctum::actingAs($this->ownerWithUserManagement($team));
+
+        $this->postJson('/api/v1/users', $this->payload([
+            'role' => User::ROLE_ADMIN,
+        ]))->assertCreated();
+
+        $this->assertDatabaseHas('users', [
+            'email' => 'new.person@example.com',
+            'role' => User::ROLE_ADMIN,
+            'team_id' => $team->id,
+        ]);
+    }
+
+    public function test_owner_can_promote_a_staff_member_to_admin(): void
+    {
+        $team = $this->team('Unit A', 'unit-a');
+        $staff = User::factory()->create([
+            'role' => User::ROLE_STAFF,
+            'team_id' => $team->id,
+        ]);
+        $staff->syncRoleToSpatie();
+
+        $owner = User::factory()->create([
+            'role' => User::ROLE_OWNER,
+            'team_id' => $team->id,
+        ]);
+        $owner->syncRoleToSpatie();
+        $owner->syncModules(['users']);
+
+        Sanctum::actingAs($owner->fresh());
+
+        $this->putJson("/api/v1/users/{$staff->id}", [
+            'role' => User::ROLE_ADMIN,
+        ])->assertOk();
+
+        $this->assertSame(User::ROLE_ADMIN, $staff->fresh()->role);
     }
 
     public function test_admin_can_still_create_staff_and_viewer(): void

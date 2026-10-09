@@ -60,8 +60,18 @@ class UserPolicy
             return false;
         }
 
-        // A non-super-admin cannot manage super admins, admins, or other owners.
-        if (! $user->isSuperAdmin() && in_array($model->role, [User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN, User::ROLE_OWNER], true)) {
+        if ($user->isSuperAdmin()) {
+            return true;
+        }
+
+        // An owner manages everyone in their own unit, admins included, but
+        // never a peer owner or a super admin.
+        if ($user->isOwner()) {
+            return in_array($model->role, [User::ROLE_ADMIN, User::ROLE_STAFF, User::ROLE_VIEWER], true);
+        }
+
+        // Any other role (admin) cannot manage super admins, admins or owners.
+        if (in_array($model->role, [User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN, User::ROLE_OWNER], true)) {
             return false;
         }
 
@@ -82,12 +92,35 @@ class UserPolicy
             return false;
         }
 
-        // Only a super admin can delete any user; admins can only delete lower ranks.
+        // A super admin can delete any user.
         if ($user->isSuperAdmin()) {
             return true;
         }
 
+        // An owner deletes the people of their own unit, admins included, but
+        // never a peer owner or a super admin.
+        if ($user->isOwner()) {
+            return in_array($model->role, [User::ROLE_ADMIN, User::ROLE_STAFF, User::ROLE_VIEWER], true);
+        }
+
+        // Admins can only delete lower ranks.
         return self::ROLE_RANK[$model->role] < self::ROLE_RANK[$user->role];
+    }
+
+    /**
+     * Determine whether the user can edit a user's menu permissions.
+     *
+     * Owners and admins configure the individual access of the people in their
+     * own unit. A super admin's access is fixed (they bypass every check), so
+     * their matrix is never editable.
+     */
+    public function manageAccess(User $user, User $model): bool
+    {
+        if ($model->isSuperAdmin()) {
+            return false;
+        }
+
+        return $this->update($user, $model);
     }
 
     /**

@@ -7,15 +7,18 @@ use App\Http\Requests\AssignRoleRequest;
 use App\Http\Requests\AssignTeamRequest;
 use App\Http\Requests\ResetPasswordRequest;
 use App\Http\Requests\StoreUserRequest;
+use App\Http\Requests\UpdateUserAccessRequest;
 use App\Http\Requests\UpdateUserModulesRequest;
 use App\Http\Requests\UpdateUserRequest;
 use App\Http\Resources\UserResource;
 use App\Models\User;
+use App\Support\AccessCatalog;
 use App\Support\ModuleCatalog;
 use App\Support\UnitScope;
 use App\Support\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Spatie\Permission\PermissionRegistrar;
 
 
 class UserController extends Controller
@@ -176,12 +179,25 @@ class UserController extends Controller
     }
 
     /**
+     * Roles an owner may hand out inside their own unit.
+     *
+     * An owner runs a company, so they staff their unit with admins, staff and
+     * viewers. They may never mint another owner or a super admin, since those
+     * carry authority beyond a single unit.
+     */
+    private const OWNER_ASSIGNABLE_ROLES = [
+        User::ROLE_ADMIN,
+        User::ROLE_STAFF,
+        User::ROLE_VIEWER,
+    ];
+
+    /**
      * Roles only a super admin may hand out.
      *
-     * These carry team-scoped authority: an owner runs a company and receives
-     * feature modules from a super admin, and an admin outranks every unit. A
-     * plain rank comparison is not enough here, because "admin is above owner"
-     * would still let an admin mint new owners and new admins.
+     * These carry authority beyond a unit: an owner receives feature modules
+     * from a super admin, and an admin outranks a unit. A plain rank comparison
+     * is not enough here, because "admin is above owner" would still let an
+     * admin mint new owners and new admins.
      */
     private const SUPER_ADMIN_ONLY_ROLES = [
         User::ROLE_OWNER,
@@ -192,10 +208,10 @@ class UserController extends Controller
     /**
      * Determine whether the given acting user is allowed to set the target role.
      *
-     * Only a super admin can create owners, admins or other super admins.
-     * Everyone else who holds `users.create` is limited to staff and viewer,
-     * so an admin can staff a unit without gaining the ability to hand out
-     * company ownership, and an owner cannot escalate anyone.
+     * A super admin can create any role. An owner can staff their own unit with
+     * admins, staff and viewers. Everyone else who holds `users.create` is
+     * limited to staff and viewer, so an admin can staff a unit without gaining
+     * the ability to hand out company ownership.
      */
     private function canSetRole(User $actor, string $role): bool
     {
@@ -205,6 +221,10 @@ class UserController extends Controller
 
         if ($actor->isSuperAdmin()) {
             return true;
+        }
+
+        if ($actor->isOwner()) {
+            return in_array($role, self::OWNER_ASSIGNABLE_ROLES, true);
         }
 
         if (in_array($role, self::SUPER_ADMIN_ONLY_ROLES, true)) {
@@ -252,6 +272,73 @@ class UserController extends Controller
         return ApiResponse::success([
             'user' => new UserResource($user->fresh()->load('team')),
         ], 'Module access updated successfully.');
+    }
+
+    /**
+     * Describe the access matrix of a single user inside a unit.
+     *
+     * Returns the menu catalogue, the permissions the target user currently
+     * holds, the permissions the acting user is allowed to grant (their own
+     * ceiling, so nobody can escalate above themselves) and whether the matrix
+     * may be edited at all.
+     */
+    public function showAccess(Request $request, User $user): JsonResponse
+    {
+        $this->authorize('view', $user);
+        UnitScope::assertAccess($request->user(), $user->team_id);
+
+        $actor = $request->user();
+
+        return ApiResponse::success([
+            'target' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'role' => $user->role,
+                'role_label' => ucwords(str_replace('_', ' ', $user->role)),
+                'team_id' => $user->team_id,
+            ],
+            'catalog' => AccessCatalog::toArray(),
+            'actions' => AccessCatalog::ACTIONS,
+            'permissions' => $user->getRoleAbilities(),
+            'grantable' => $actor->getRoleAbilities(),
+            'editable' => $actor->can('manageAccess', $user),
+        ]);
+    }
+
+    /**
+     * Replace the access matrix of a single user.
+     *
+     * The submitted set becomes the user's effective feature permissions,
+     * regardless of their role. A unit-scoped actor may only change permissions
+     * within their own ceiling; anything outside it is left untouched so an
+     * owner cannot downgrade access they do not administer.
+     */
+    public function updateAccess(UpdateUserAccessRequest $request, User $user): JsonResponse
+    {
+        UnitScope::assertAccess($request->user(), $user->team_id);
+
+        $actor = $request->user();
+        $desired = $request->permissionNames();
+
+        if (! $actor->isSuperAdmin()) {
+            $grantable = $actor->getRoleAbilities();
+            $untouchable = array_values(array_diff($user->getRoleAbilities(), $grantable));
+
+            $desired = array_values(array_unique(array_merge(
+                array_intersect($desired, $grantable),
+                $untouchable,
+            )));
+        }
+
+        $user->syncAccessPermissions($desired);
+
+        // Permissions changed, so cached abilities and existing tokens are stale.
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
+        $user->tokens()->delete();
+
+        return ApiResponse::success([
+            'user' => new UserResource($user->fresh()->load('team')),
+        ], 'Hak akses pengguna berhasil diperbarui.');
     }
 
     /**
