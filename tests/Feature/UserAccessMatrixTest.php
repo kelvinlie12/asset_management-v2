@@ -144,7 +144,7 @@ class UserAccessMatrixTest extends TestCase
         $this->assertFalse($userB->fresh()->can('assets.view'));
     }
 
-    public function test_owner_grants_unit_features_but_not_system_permissions(): void
+    public function test_owner_grants_the_programmed_modules_but_not_role_admin(): void
     {
         $team = $this->team('Unit A');
         $staff = $this->person($team);
@@ -154,19 +154,21 @@ class UserAccessMatrixTest extends TestCase
 
         Sanctum::actingAs($this->ownerOf($team));
 
-        // suppliers.view lives in the owner's unit catalogue, so it is granted
-        // even though the actor does not personally hold it. roles.view belongs
-        // to the system group an owner may not hand out, so it is ignored.
+        // Every module the programmer defined is grantable: suppliers.view is
+        // given even though the actor does not personally hold it, and so is
+        // audit_logs.view. Managing the roles/permissions RBAC stays with a
+        // super admin, so those are ignored.
         $this->putJson("/api/v1/users/{$staff->id}/access", [
-            'permissions' => ['suppliers.view', 'roles.view'],
+            'permissions' => ['suppliers.view', 'audit_logs.view', 'roles.view', 'permissions.create'],
         ])->assertOk();
 
         $fresh = $staff->fresh();
 
         $this->assertTrue($fresh->can('suppliers.view'));
+        $this->assertTrue($fresh->can('audit_logs.view'));
         $this->assertFalse($fresh->can('roles.view'));
-        // rooms.view is inside the owner's catalogue and was not selected, so
-        // it is revoked.
+        $this->assertFalse($fresh->can('permissions.create'));
+        // rooms.view was not selected, so it is revoked.
         $this->assertFalse($fresh->can('rooms.view'));
     }
 

@@ -239,23 +239,25 @@ class AccessCatalog
     }
 
     /**
-     * Feature permissions a unit owner may hand out.
+     * Feature permissions a unit owner may hand out to their staff.
      *
-     * The `system` group (roles, permissions, audit log) is reserved for a
-     * super admin, so an owner manages everything else in their own unit.
+     * Every module the programmer defined is grantable by an owner - assets,
+     * vehicles, network, rooms, suppliers, users and the unit audit log. The
+     * only exceptions are the role/permission administrators of the `system`
+     * group: managing the RBAC itself stays with a super admin.
      *
      * @return list<string>
      */
-    public static function permissionNamesExceptSystem(): array
+    public static function ownerGrantableNames(): array
     {
         $names = [];
 
         foreach (self::GROUPS as $group) {
-            if ($group['key'] === 'system') {
-                continue;
-            }
-
             foreach ($group['features'] as $feature) {
+                if (in_array($feature['key'], ['roles', 'permissions'], true)) {
+                    continue;
+                }
+
                 foreach ($feature['actions'] as $permission) {
                     $names[$permission] = true;
                 }
