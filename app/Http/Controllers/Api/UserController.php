@@ -284,7 +284,7 @@ class UserController extends Controller
      */
     public function showAccess(Request $request, User $user): JsonResponse
     {
-        $this->authorize('view', $user);
+        $this->authorize('manageAccess', $user);
         UnitScope::assertAccess($request->user(), $user->team_id);
 
         $actor = $request->user();
@@ -338,6 +338,7 @@ class UserController extends Controller
      */
     public function updateAccess(UpdateUserAccessRequest $request, User $user): JsonResponse
     {
+        $this->authorize('manageAccess', $user);
         UnitScope::assertAccess($request->user(), $user->team_id);
 
         $actor = $request->user();

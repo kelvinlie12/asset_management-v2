@@ -108,19 +108,32 @@ class UserPolicy
     }
 
     /**
-     * Determine whether the user can edit a user's menu permissions.
+     * Determine whether the user can edit a user's access rights.
      *
-     * Owners and admins configure the individual access of the people in their
-     * own unit. A super admin's access is fixed (they bypass every check), so
-     * their matrix is never editable.
+     * Handing out access rights is its own privilege (`users.manage_access`),
+     * separate from editing a user account. A super admin administers everyone.
+     * An owner administers the admins, staff and viewers of their own unit;
+     * every other role limits itself to staff and viewers.
      */
     public function manageAccess(User $user, User $model): bool
     {
-        if ($model->isSuperAdmin()) {
+        if (! $this->canManage($user, 'users.manage_access')) {
             return false;
         }
 
-        return $this->update($user, $model);
+        if ($model->isSuperAdmin() || $user->id === $model->id) {
+            return false;
+        }
+
+        if ($user->isSuperAdmin()) {
+            return true;
+        }
+
+        if ($user->isOwner()) {
+            return in_array($model->role, [User::ROLE_ADMIN, User::ROLE_STAFF, User::ROLE_VIEWER], true);
+        }
+
+        return in_array($model->role, [User::ROLE_STAFF, User::ROLE_VIEWER], true);
     }
 
     /**

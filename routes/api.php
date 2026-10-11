@@ -51,8 +51,8 @@ Route::prefix('v1')->group(function () {
         Route::put('/users/{user}', [UserController::class, 'update'])->middleware('permission:users.update');
         Route::put('/users/{user}/modules', [UserController::class, 'updateModules'])->middleware('permission:users.update');
         // Per-user menu/feature/action matrix inside a unit.
-        Route::get('/users/{user}/access', [UserController::class, 'showAccess'])->middleware('permission:users.view');
-        Route::put('/users/{user}/access', [UserController::class, 'updateAccess'])->middleware('permission:users.update');
+        Route::get('/users/{user}/access', [UserController::class, 'showAccess'])->middleware('permission:users.manage_access');
+        Route::put('/users/{user}/access', [UserController::class, 'updateAccess'])->middleware('permission:users.manage_access');
         Route::delete('/users/{user}', [UserController::class, 'destroy'])->middleware('permission:users.delete');
         Route::put('/users/{user}/assign-role', [UserController::class, 'assignRole'])->middleware('permission:users.update');
         Route::put('/users/{user}/assign-team', [UserController::class, 'assignTeam'])->middleware('permission:users.update');

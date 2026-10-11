@@ -136,6 +136,7 @@ class ModuleCatalog
                 'users.create',
                 'users.update',
                 'users.delete',
+                'users.manage_access',
             ],
         ],
         'audit_logs' => [

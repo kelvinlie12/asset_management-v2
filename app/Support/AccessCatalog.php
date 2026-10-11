@@ -21,7 +21,17 @@ class AccessCatalog
      *
      * @var list<string>
      */
-    public const ACTIONS = ['view', 'create', 'update', 'delete'];
+    public const ACTIONS = ['view', 'create', 'update', 'delete', 'manage_access'];
+
+    /**
+     * Permissions a user may hold but never pass down to someone else.
+     *
+     * Only a super admin decides who may administer access rights themselves,
+     * so `users.manage_access` is never part of what an owner hands out.
+     *
+     * @var list<string>
+     */
+    public const NOT_DELEGATABLE = ['users.manage_access'];
 
     /**
      * Menus, each holding the features (permission bundles) they expose.
@@ -174,6 +184,7 @@ class AccessCatalog
                         'create' => 'users.create',
                         'update' => 'users.update',
                         'delete' => 'users.delete',
+                        'manage_access' => 'users.manage_access',
                     ],
                 ],
             ],
@@ -245,7 +256,8 @@ class AccessCatalog
      * A module is grantable as soon as the owner personally holds any action
      * inside it, and then the whole module (every feature and action) can be
      * passed down to the staff of their unit. The roles/permissions
-     * administrators stay with a super admin no matter what.
+     * administrators - and the `users.manage_access` flag itself - stay with a
+     * super admin no matter what.
      *
      * @param  list<string>  $held  the actor's effective permission names
      * @return list<string>
@@ -264,6 +276,10 @@ class AccessCatalog
                 $ownsModule = false;
 
                 foreach ($feature['actions'] as $permission) {
+                    if (in_array($permission, self::NOT_DELEGATABLE, true)) {
+                        continue;
+                    }
+
                     if (isset($held[$permission])) {
                         $ownsModule = true;
                     }
@@ -274,6 +290,10 @@ class AccessCatalog
                 }
 
                 foreach ($feature['actions'] as $permission) {
+                    if (in_array($permission, self::NOT_DELEGATABLE, true)) {
+                        continue;
+                    }
+
                     $names[$permission] = true;
                 }
             }

@@ -97,6 +97,7 @@ class User extends Authenticatable
             'users.create',
             'users.update',
             'users.delete',
+            'users.manage_access',
             'teams.view',
             'teams.create',
             'teams.update',

@@ -277,4 +277,54 @@ class UserAccessMatrixTest extends TestCase
         // The owner cannot even open the matrix of a super admin.
         $this->getJson("/api/v1/users/{$super->id}/access")->assertForbidden();
     }
+
+    public function test_owner_without_manage_access_cannot_edit_access(): void
+    {
+        $team = $this->team('Unit A');
+        $staff = $this->person($team);
+        $owner = User::factory()->create(['role' => User::ROLE_OWNER, 'team_id' => $team->id]);
+        $owner->syncRoleToSpatie();
+        $owner->syncModules(['assets']);
+
+        Sanctum::actingAs($owner);
+
+        // Owning an asset module alone is not enough: the super admin must
+        // hand out the access-administration privilege first.
+        $this->getJson("/api/v1/users/{$staff->id}/access")->assertForbidden();
+        $this->putJson("/api/v1/users/{$staff->id}/access", [
+            'permissions' => ['assets.view'],
+        ])->assertForbidden();
+    }
+
+    public function test_owner_passes_down_only_the_modules_they_were_given(): void
+    {
+        $team = $this->team('Unit A');
+        $staff = $this->person($team);
+        $owner = User::factory()->create(['role' => User::ROLE_OWNER, 'team_id' => $team->id]);
+        $owner->syncRoleToSpatie();
+        $owner->syncModules(['assets']);
+        // A super admin entrusts the owner with the access-administration
+        // privilege and the assets module - and nothing else.
+        $owner->syncAccessPermissions([
+            'assets.view',
+            'users.manage_access',
+        ]);
+        $this->assertTrue($owner->fresh()->can('users.manage_access'));
+
+        Sanctum::actingAs($owner);
+
+        $this->getJson("/api/v1/users/{$staff->id}/access")->assertOk();
+
+        // Holding any action inside a module opens that whole module, but only
+        // that module - and never the ability to hand out access rights itself.
+        $this->putJson("/api/v1/users/{$staff->id}/access", [
+            'permissions' => ['assets.delete', 'users.view', 'users.manage_access'],
+        ])->assertOk();
+
+        $fresh = $staff->fresh();
+
+        $this->assertTrue($fresh->can('assets.delete'));
+        $this->assertFalse($fresh->can('users.view'));
+        $this->assertFalse($fresh->can('users.manage_access'));
+    }
 }
