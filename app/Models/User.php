@@ -9,9 +9,11 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Collection;
 use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Contracts\Permission as PermissionContract;
 use Spatie\Permission\Models\Permission;
+use Spatie\Permission\PermissionRegistrar;
 use Spatie\Permission\Traits\HasRoles;
 
 class User extends Authenticatable
@@ -357,16 +359,66 @@ class User extends Authenticatable
             self::MANDATORY_PERMISSIONS,
         )));
 
+        // Access Rights are data-driven: granting a catalogue permission (for
+        // example `users.manage_access`) from User Management has to work even
+        // when the permissions table was never seeded, so missing rows are
+        // created on the fly.
+        $permissionModels = $this->ensurePermissionRowsExist($permissions);
+
         $rolePermissions = $this->getPermissionsViaRoles()->pluck('name')->all();
 
         $direct = array_values(array_diff($permissions, $rolePermissions));
         $denied = array_values(array_diff($rolePermissions, $permissions));
 
-        $this->syncPermissions($direct);
+        // Hand Spatie the resolved models instead of names: `syncPermissions`
+        // resolves strings through the registrar's permission cache, which can
+        // be stale and still report a freshly-created permission as missing.
+        $directModels = collect($direct)
+            ->map(fn (string $name) => $permissionModels->get($name))
+            ->filter()
+            ->values();
+
+        $this->syncPermissions($directModels);
+
         $this->forceFill(['denied_permissions' => $denied])->save();
 
         $this->unsetRelation('permissions');
         $this->unsetRelation('roles');
+    }
+
+    /**
+     * Make sure every permission row exists before a Spatie permission sync.
+     *
+     * Spatie throws when a permission name has no row in the `permissions`
+     * table, but access is purely data-driven today. Creating the missing
+     * catalogue rows on the fly keeps User Management the single source of
+     * truth: assigning a fresh permission works even before the seeder ran.
+     *
+     * @param  list<string>  $names
+     * @return Collection<string, Permission>
+     */
+    private function ensurePermissionRowsExist(array $names): Collection
+    {
+        $guard = $this->getDefaultGuardName();
+
+        foreach ($names as $name) {
+            // Query the model directly: `findOrCreate` consults Spatie's cached
+            // permission snapshot, which may be stale and hide a missing row.
+            Permission::query()->firstOrCreate(
+                ['name' => $name, 'guard_name' => $guard],
+                ['name' => $name, 'guard_name' => $guard],
+            );
+        }
+
+        // Fresh rows are invisible to the registrar's cached permission
+        // snapshot, so throw it away before any Spatie sync runs.
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+        return Permission::query()
+            ->where('guard_name', $guard)
+            ->whereIn('name', $names)
+            ->get()
+            ->keyBy('name');
     }
 
     /**
@@ -421,10 +473,16 @@ class User extends Authenticatable
 
         // Profile access is mandatory and must survive every module reset now
         // that roles no longer grant it.
-        $this->syncPermissions(array_values(array_unique(array_merge(
+        $permissions = array_values(array_unique(array_merge(
             ModuleCatalog::permissionsFor($keys),
             self::MANDATORY_PERMISSIONS,
-        ))));
+        )));
+
+        // Resolve to models rather than names so the sync never consults the
+        // registrar's cache for a permission row that was just created.
+        $models = $this->ensurePermissionRowsExist($permissions)->values();
+
+        $this->syncPermissions($models);
 
         // A module preset supersedes any hand-tuned per-user overrides.
         if (! empty($this->denied_permissions)) {

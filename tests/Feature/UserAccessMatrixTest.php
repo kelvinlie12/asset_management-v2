@@ -327,4 +327,37 @@ class UserAccessMatrixTest extends TestCase
         $this->assertFalse($fresh->can('users.view'));
         $this->assertFalse($fresh->can('users.manage_access'));
     }
+
+    public function test_granting_a_catalogue_permission_from_user_management_creates_the_row(): void
+    {
+        $team = $this->team('Unit A');
+        $owner = $this->ownerOf($team);
+
+        // Simulate a production database that was never re-seeded after a new
+        // permission was added to the catalogue.
+        \Spatie\Permission\Models\Permission::query()
+            ->where('name', 'users.manage_access')
+            ->delete();
+        app(\Spatie\Permission\PermissionRegistrar::class)->forgetCachedPermissions();
+        $this->assertFalse(
+            \Spatie\Permission\Models\Permission::query()
+                ->where('name', 'users.manage_access')
+                ->exists()
+        );
+
+        // A super admin hands the permission straight from User Management.
+        Sanctum::actingAs($this->superAdmin());
+
+        $this->putJson("/api/v1/users/{$owner->id}/access", [
+            'permissions' => ['users.manage_access', 'assets.view'],
+        ])->assertOk();
+
+        $this->assertTrue($owner->fresh()->can('users.manage_access'));
+        $this->assertTrue($owner->fresh()->can('assets.view'));
+        $this->assertTrue(
+            \Spatie\Permission\Models\Permission::query()
+                ->where('name', 'users.manage_access')
+                ->exists()
+        );
+    }
 }
