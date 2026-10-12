@@ -341,5 +341,10 @@ class OwnerModuleAccessTest extends TestCase
             ModuleCatalog::DEFAULT_OWNER_MODULES,
             $byEmail[$keuangan->email]['modules']
         );
+
+        // The listing must expose each user's unit so the client can decide
+        // who may administer whom (unit-scoped Access Rights).
+        $this->assertSame($teamA->id, $byEmail[$teknik->email]['team_id']);
+        $this->assertSame($teamB->id, $byEmail[$keuangan->email]['team_id']);
     }
 }
