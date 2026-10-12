@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Http\Requests\AssignPermissionsToRoleRequest;
 use App\Http\Requests\StoreRoleRequest;
 use App\Http\Requests\UpdateRoleRequest;
 use App\Http\Resources\RoleResource;
@@ -96,20 +95,5 @@ class RoleController extends Controller
         app(PermissionRegistrar::class)->forgetCachedPermissions();
 
         return ApiResponse::noContent('Role deleted successfully.');
-    }
-
-    /**
-     * Assign permissions to a role.
-     */
-    public function assignPermissions(AssignPermissionsToRoleRequest $request, Role $role): JsonResponse
-    {
-        $role->permissions()->sync($request->validated('permission_ids'));
-
-        // Drop the Spatie cache so subsequent authorization reads see the new set.
-        app(PermissionRegistrar::class)->forgetCachedPermissions();
-
-        return ApiResponse::success([
-            'role' => new RoleResource($role->fresh()->load('permissions')),
-        ], 'Permissions assigned successfully.');
     }
 }

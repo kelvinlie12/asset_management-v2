@@ -154,7 +154,6 @@ Route::get('/vehicles', [VehicleController::class, 'index'])->middleware('permis
         Route::get('/roles/{role}', [RoleController::class, 'show'])->middleware('permission:roles.view');
         Route::put('/roles/{role}', [RoleController::class, 'update'])->middleware('permission:roles.update');
         Route::delete('/roles/{role}', [RoleController::class, 'destroy'])->middleware('permission:roles.delete');
-        Route::put('/roles/{role}/permissions', [RoleController::class, 'assignPermissions'])->middleware('permission:roles.update');
 
         // Permission management (RBAC)
         Route::get('/permissions', [PermissionController::class, 'index'])->middleware('permission:permissions.view');
