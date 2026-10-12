@@ -215,12 +215,12 @@ class OwnerModuleAccessTest extends TestCase
 
     public function test_super_admin_can_read_the_module_catalogue(): void
     {
+        $team = $this->team('Unit A');
+        $owner = $this->ownerOf($team);
+
         Sanctum::actingAs($this->superAdmin());
 
-        $response = $this->getJson('/api/v1/users/module-catalog');
-
-        $response->assertOk()
-            ->assertJsonPath('data.defaults', ModuleCatalog::DEFAULT_OWNER_MODULES);
+        $response = $this->getJson("/api/v1/users/{$owner->id}/access")->assertOk();
 
         $keys = array_column($response->json('data.modules'), 'key');
         $this->assertSame(ModuleCatalog::keys(), $keys);
@@ -233,7 +233,7 @@ class OwnerModuleAccessTest extends TestCase
 
         Sanctum::actingAs($this->superAdmin());
 
-        $response = $this->putJson("/api/v1/users/{$owner->id}/modules", [
+        $response = $this->putJson("/api/v1/users/{$owner->id}/access", [
             'modules' => ['assets', 'vehicles'],
         ]);
 
@@ -255,7 +255,7 @@ class OwnerModuleAccessTest extends TestCase
 
         Sanctum::actingAs($ownerA->fresh());
 
-        $this->putJson("/api/v1/users/{$ownerB->id}/modules", [
+        $this->putJson("/api/v1/users/{$ownerB->id}/access", [
             'modules' => ['assets'],
         ])->assertForbidden();
 
@@ -272,7 +272,7 @@ class OwnerModuleAccessTest extends TestCase
 
         Sanctum::actingAs($this->superAdmin());
 
-        $this->putJson("/api/v1/users/{$owner->id}/modules", [
+        $this->putJson("/api/v1/users/{$owner->id}/access", [
             'modules' => ['assets', 'not_a_module'],
         ])->assertStatus(422);
     }
@@ -283,9 +283,11 @@ class OwnerModuleAccessTest extends TestCase
 
         Sanctum::actingAs($this->superAdmin());
 
-        $this->putJson("/api/v1/users/{$admin->id}/modules", [
+        // A super admin's access can never be rewritten, not even by another
+        // super admin, so the catalogue stays whole.
+        $this->putJson("/api/v1/users/{$admin->id}/access", [
             'modules' => ['assets'],
-        ])->assertStatus(422);
+        ])->assertForbidden();
 
         // A super admin still owns every module.
         $this->assertSame(

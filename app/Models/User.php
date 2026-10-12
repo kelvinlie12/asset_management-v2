@@ -432,11 +432,13 @@ class User extends Authenticatable
     }
 
     /**
-     * The module keys this user currently has access to.
+     * The module keys this user currently reaches.
      *
-     * A module counts as granted when every permission in its bundle is part
-     * of the user's effective permission set. Super admins implicitly own
-     * every module, so the catalogue is returned untouched for them.
+     * A module counts as reached as soon as the user holds any of its
+     * delegatable permissions, which keeps the listing in step with the access
+     * matrix: a view-only grant still shows the module as selected. Super
+     * admins implicitly own every module, so the catalogue is returned
+     * untouched for them.
      *
      * @return list<string>
      */
@@ -446,28 +448,18 @@ class User extends Authenticatable
             return ModuleCatalog::keys();
         }
 
-        $effective = $this->getRoleAbilities();
-
-        return array_values(array_filter(
-            ModuleCatalog::keys(),
-            static function (string $key) use ($effective) {
-                foreach (ModuleCatalog::MODULES[$key]['permissions'] as $permission) {
-                    if (! in_array($permission, $effective, true)) {
-                        return false;
-                    }
-                }
-
-                return true;
-            }
-        ));
+        return ModuleCatalog::heldBy($this->getRoleAbilities());
     }
 
     /**
      * Replace this user's module grants with the given keys.
      *
      * @param  list<string>  $keys
+     * @param  bool  $includeRestricted  when false, permissions reserved for a
+     *   super admin (for example `users.manage_access`) are stripped, which is
+     *   what happens when a unit owner passes a module down to their staff.
      */
-    public function syncModules(array $keys): void
+    public function syncModules(array $keys, bool $includeRestricted = true): void
     {
         $keys = ModuleCatalog::sanitizeKeys($keys);
 
@@ -477,6 +469,10 @@ class User extends Authenticatable
             ModuleCatalog::permissionsFor($keys),
             self::MANDATORY_PERMISSIONS,
         )));
+
+        if (! $includeRestricted) {
+            $permissions = array_values(array_diff($permissions, AccessCatalog::NOT_DELEGATABLE));
+        }
 
         // Resolve to models rather than names so the sync never consults the
         // registrar's cache for a permission row that was just created.

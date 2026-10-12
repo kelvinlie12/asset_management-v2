@@ -2,7 +2,7 @@
 
 namespace App\Http\Requests;
 
-use App\Support\AccessCatalog;
+use App\Support\ModuleCatalog;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -24,8 +24,8 @@ class UpdateUserAccessRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'permissions' => ['present', 'array'],
-            'permissions.*' => ['string', Rule::in(AccessCatalog::permissionNames())],
+            'modules' => ['present', 'array'],
+            'modules.*' => ['string', Rule::in(ModuleCatalog::keys())],
         ];
     }
 
@@ -35,19 +35,19 @@ class UpdateUserAccessRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'permissions.present' => 'Kirim daftar izin, atau array kosong untuk mencabut semua akses fitur.',
-            'permissions.array' => 'Izin harus dikirim sebagai daftar.',
-            'permissions.*.in' => 'Izin tidak dikenal.',
+            'modules.present' => 'Kirim daftar modul, atau array kosong untuk mencabut semua akses.',
+            'modules.array' => 'Modul harus dikirim sebagai daftar.',
+            'modules.*.in' => 'Modul tidak dikenal.',
         ];
     }
 
     /**
-     * The sanitized list of permissions to apply.
+     * The sanitized list of modules to apply.
      *
      * @return list<string>
      */
-    public function permissionNames(): array
+    public function moduleKeys(): array
     {
-        return AccessCatalog::sanitize($this->validated('permissions', []));
+        return ModuleCatalog::sanitizeKeys($this->validated('modules', []));
     }
 }

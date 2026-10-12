@@ -250,59 +250,6 @@ class AccessCatalog
     }
 
     /**
-     * Permissions a unit owner may hand out to their staff.
-     *
-     * An owner administers exactly the modules a super admin entrusted to them.
-     * A module is grantable as soon as the owner personally holds any action
-     * inside it, and then the whole module (every feature and action) can be
-     * passed down to the staff of their unit. The roles/permissions
-     * administrators - and the `users.manage_access` flag itself - stay with a
-     * super admin no matter what.
-     *
-     * @param  list<string>  $held  the actor's effective permission names
-     * @return list<string>
-     */
-    public static function grantablesForHeldModules(array $held): array
-    {
-        $held = array_flip($held);
-        $names = [];
-
-        foreach (self::GROUPS as $group) {
-            foreach ($group['features'] as $feature) {
-                if (in_array($feature['key'], ['roles', 'permissions'], true)) {
-                    continue;
-                }
-
-                $ownsModule = false;
-
-                foreach ($feature['actions'] as $permission) {
-                    if (in_array($permission, self::NOT_DELEGATABLE, true)) {
-                        continue;
-                    }
-
-                    if (isset($held[$permission])) {
-                        $ownsModule = true;
-                    }
-                }
-
-                if (! $ownsModule) {
-                    continue;
-                }
-
-                foreach ($feature['actions'] as $permission) {
-                    if (in_array($permission, self::NOT_DELEGATABLE, true)) {
-                        continue;
-                    }
-
-                    $names[$permission] = true;
-                }
-            }
-        }
-
-        return array_keys($names);
-    }
-
-    /**
      * Keep only the permissions this catalogue knows how to grant.
      *
      * @param  list<string>  $permissions

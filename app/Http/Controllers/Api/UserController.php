@@ -8,11 +8,9 @@ use App\Http\Requests\AssignTeamRequest;
 use App\Http\Requests\ResetPasswordRequest;
 use App\Http\Requests\StoreUserRequest;
 use App\Http\Requests\UpdateUserAccessRequest;
-use App\Http\Requests\UpdateUserModulesRequest;
 use App\Http\Requests\UpdateUserRequest;
 use App\Http\Resources\UserResource;
 use App\Models\User;
-use App\Support\AccessCatalog;
 use App\Support\ModuleCatalog;
 use App\Support\UnitScope;
 use App\Support\ApiResponse;
@@ -235,52 +233,11 @@ class UserController extends Controller
     }
 
     /**
-     * List the modules a super admin can hand to an owner.
-     */
-    public function moduleCatalog(Request $request): JsonResponse
-    {
-        if (! $request->user()?->isSuperAdmin()) {
-            return ApiResponse::error('You are not allowed to manage module access.', null, 403);
-        }
-
-        return ApiResponse::success([
-            'modules' => ModuleCatalog::toArray(),
-            'defaults' => ModuleCatalog::DEFAULT_OWNER_MODULES,
-        ]);
-    }
-
-    /**
-     * Replace the set of modules a given user can reach.
+     * Render the module access matrix of a single user.
      *
-     * Menus are permission driven, so this is what makes one owner see a
-     * different sidebar from another. Super admins are rejected: they bypass
-     * every check anyway, so a grant list would be misleading.
-     */
-    public function updateModules(UpdateUserModulesRequest $request, User $user): JsonResponse
-    {
-        if ($user->isSuperAdmin()) {
-            return ApiResponse::error('Super admin always has access to every module.', null, 422);
-        }
-
-        $user->syncModules($request->moduleKeys());
-
-        // Permission changes invalidate the cached ability snapshot and any
-        // token that was minted with the previous menu set.
-        app(\Spatie\Permission\PermissionRegistrar::class)->forgetCachedPermissions();
-        $user->tokens()->delete();
-
-        return ApiResponse::success([
-            'user' => new UserResource($user->fresh()->load('team')),
-        ], 'Module access updated successfully.');
-    }
-
-    /**
-     * Describe the access matrix of a single user inside a unit.
-     *
-     * Returns the menu catalogue, the permissions the target user currently
-     * holds, the permissions the acting user is allowed to grant (their own
-     * ceiling, so nobody can escalate above themselves) and whether the matrix
-     * may be edited at all.
+     * The catalogue is the module list a super admin can hand to (or take away
+     * from) a user. `selected` marks the modules the target currently reaches,
+     * while `grantable` marks the ones the acting user may change.
      */
     public function showAccess(Request $request, User $user): JsonResponse
     {
@@ -297,56 +254,62 @@ class UserController extends Controller
                 'role_label' => ucwords(str_replace('_', ' ', $user->role)),
                 'team_id' => $user->team_id,
             ],
-            'catalog' => AccessCatalog::toArray(),
-            'actions' => AccessCatalog::ACTIONS,
-            'permissions' => $user->getRoleAbilities(),
-            'grantable' => $this->grantablePermissions($actor),
+            'modules' => ModuleCatalog::describe(
+                ModuleCatalog::heldBy($user->getRoleAbilities()),
+                $this->grantableModules($actor),
+            ),
             'editable' => $actor->can('manageAccess', $user),
         ]);
     }
 
     /**
-     * The feature permissions the acting user may hand out.
+     * The modules the acting user may hand down.
      *
-     * A super admin can grant anything. A unit owner distributes exactly the
-     * modules a super admin entrusted to them, so their staff can only ever
-     * reach what the owner has been given. Anyone else is capped at what they
-     * hold themselves.
+     * A super admin can grant anything. Everyone else - an owner included -
+     * distributes exactly the modules they personally reach, so their staff can
+     * only ever be given what the actor was given.
      *
      * @return list<string>
      */
-    private function grantablePermissions(User $actor): array
+    private function grantableModules(User $actor): array
     {
         if ($actor->isSuperAdmin()) {
-            return AccessCatalog::permissionNames();
+            return ModuleCatalog::keys();
         }
 
-        if ($actor->isOwner()) {
-            return AccessCatalog::grantablesForHeldModules($actor->getRoleAbilities());
-        }
-
-        return $actor->getRoleAbilities();
+        return ModuleCatalog::grantableBy($actor->getRoleAbilities());
     }
 
     /**
-     * Replace the access matrix of a single user.
+     * Replace the module access matrix of a single user.
      *
-     * The submitted set becomes the user's effective feature permissions,
-     * regardless of their role. A unit-scoped actor may only change permissions
-     * within their own ceiling; anything outside it is left untouched so an
-     * owner cannot downgrade access they do not administer.
+     * The submitted modules become the user's effective access. A unit-scoped
+     * actor may only toggle modules within their own ceiling; anything outside
+     * it is left untouched so an owner cannot downgrade access they do not
+     * administer. Only a super admin can hand down a reserved permission such
+     * as `users.manage_access`, so an owner never passes that along.
      */
     public function updateAccess(UpdateUserAccessRequest $request, User $user): JsonResponse
     {
         $this->authorize('manageAccess', $user);
         UnitScope::assertAccess($request->user(), $user->team_id);
 
+        // A super admin implicitly owns every module, so their matrix is never
+        // rewritten - not even by another super admin (who would otherwise
+        // bypass the policy through the global Gate::before hook).
+        if ($user->isSuperAdmin()) {
+            return ApiResponse::error('A super admin always keeps full access.', null, 403);
+        }
+
         $actor = $request->user();
-        $desired = $request->permissionNames();
+        $desired = $request->moduleKeys();
 
         if (! $actor->isSuperAdmin()) {
-            $grantable = $this->grantablePermissions($actor);
-            $untouchable = array_values(array_diff($user->getRoleAbilities(), $grantable));
+            $grantable = $this->grantableModules($actor);
+            $untouchable = array_values(array_diff(
+                ModuleCatalog::heldBy($user->getRoleAbilities()),
+                $grantable,
+            ));
 
             $desired = array_values(array_unique(array_merge(
                 array_intersect($desired, $grantable),
@@ -354,7 +317,7 @@ class UserController extends Controller
             )));
         }
 
-        $user->syncAccessPermissions($desired);
+        $user->syncModules($desired, $actor->isSuperAdmin());
 
         // Permissions changed, so cached abilities and existing tokens are stale.
         app(PermissionRegistrar::class)->forgetCachedPermissions();

@@ -45,12 +45,10 @@ Route::prefix('v1')->group(function () {
 
         // User Management
         Route::get('/users', [UserController::class, 'index'])->middleware('permission:users.view');
-        Route::get('/users/module-catalog', [UserController::class, 'moduleCatalog'])->middleware('permission:users.view');
         Route::post('/users', [UserController::class, 'store'])->middleware('permission:users.create');
         Route::get('/users/{user}', [UserController::class, 'show'])->middleware('permission:users.view');
         Route::put('/users/{user}', [UserController::class, 'update'])->middleware('permission:users.update');
-        Route::put('/users/{user}/modules', [UserController::class, 'updateModules'])->middleware('permission:users.update');
-        // Per-user menu/feature/action matrix inside a unit.
+        // Per-user module access matrix inside a unit.
         Route::get('/users/{user}/access', [UserController::class, 'showAccess'])->middleware('permission:users.manage_access');
         Route::put('/users/{user}/access', [UserController::class, 'updateAccess'])->middleware('permission:users.manage_access');
         Route::delete('/users/{user}', [UserController::class, 'destroy'])->middleware('permission:users.delete');

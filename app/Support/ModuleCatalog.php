@@ -207,11 +207,76 @@ class ModuleCatalog
     }
 
     /**
-     * Describe the catalogue for the client.
+     * The permissions of a module that may be handed down by a unit owner.
      *
-     * @return list<array{key: string, label: string, description: string, default: bool}>
+     * A couple of permissions (for example `users.manage_access`) are reserved
+     * for a super admin, so they never travel with the module when an owner
+     * passes it to their staff.
+     *
+     * @return list<string>
      */
-    public static function toArray(): array
+    public static function delegatablePermissions(string $key): array
+    {
+        if (! self::has($key)) {
+            return [];
+        }
+
+        return array_values(array_filter(
+            self::MODULES[$key]['permissions'],
+            static fn (string $permission) => ! in_array($permission, AccessCatalog::NOT_DELEGATABLE, true)
+        ));
+    }
+
+    /**
+     * The modules a user effectively reaches, given their permissions.
+     *
+     * A module counts as reached as soon as the user holds any of its
+     * delegatable permissions: a menu follows a single view grant, so a partial
+     * module is still "on" for that user.
+     *
+     * @param  list<string>  $abilities
+     * @return list<string>
+     */
+    public static function heldBy(array $abilities): array
+    {
+        $held = array_flip($abilities);
+
+        return array_values(array_filter(
+            self::keys(),
+            static function (string $key) use ($held): bool {
+                foreach (self::delegatablePermissions($key) as $permission) {
+                    if (isset($held[$permission])) {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+        ));
+    }
+
+    /**
+     * The modules a user may hand down to others.
+     *
+     * Same rule as {@see heldBy()}: owning any action inside a module opens the
+     * whole module for delegation. A super admin is handled by the caller.
+     *
+     * @param  list<string>  $abilities
+     * @return list<string>
+     */
+    public static function grantableBy(array $abilities): array
+    {
+        return self::heldBy($abilities);
+    }
+
+    /**
+     * Describe the catalogue for the Access Rights screen.
+     *
+     * @param  list<string>  $selected  module keys the target currently holds
+     * @param  list<string>  $grantable  module keys the actor may hand out
+     * @return list<array{key: string, label: string, description: string, default: bool, selected: bool, grantable: bool}>
+     */
+    public static function describe(array $selected, array $grantable): array
     {
         return array_map(
             static fn (string $key, array $module) => [
@@ -219,6 +284,8 @@ class ModuleCatalog
                 'label' => $module['label'],
                 'description' => $module['description'],
                 'default' => in_array($key, self::DEFAULT_OWNER_MODULES, true),
+                'selected' => in_array($key, $selected, true),
+                'grantable' => in_array($key, $grantable, true),
             ],
             array_keys(self::MODULES),
             self::MODULES
