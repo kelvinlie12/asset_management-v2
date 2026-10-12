@@ -218,6 +218,29 @@ class UserAccessMatrixTest extends TestCase
         ])->assertForbidden();
     }
 
+    public function test_owner_manages_an_admin_in_their_unit(): void
+    {
+        $team = $this->team('Unit A');
+        $admin = $this->adminOf($team);
+
+        // The owner holds the users module by default, so they administer the
+        // admins of their own unit just like any other member of staff.
+        Sanctum::actingAs($this->ownerOf($team));
+
+        $this->getJson("/api/v1/users/{$admin->id}/access")
+            ->assertOk()
+            ->assertJsonPath('data.editable', true);
+
+        $this->putJson("/api/v1/users/{$admin->id}/access", [
+            'modules' => ['assets', 'users'],
+        ])->assertOk();
+
+        $fresh = $admin->fresh();
+        $this->assertTrue($fresh->can('assets.create'));
+        $this->assertTrue($fresh->can('users.view'));
+        $this->assertFalse($fresh->can('users.manage_access'));
+    }
+
     public function test_admin_manages_staff_and_viewer_but_not_another_admin(): void
     {
         $team = $this->team('Unit A');
