@@ -1,0 +1,16 @@
+<svg
+  className="size-5"
+  xmlns="http://www.w3.org/2000/svg"
+  width="22"
+  height="22"
+  viewBox="0 0 22 22"
+  fill="none"
+>
+  <path
+    d="M6.875 4.58325L17.1875 10.9999L6.875 17.4166V4.58325Z"
+    stroke="currentColor"
+    strokeWidth="1.5"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  />
+</svg>

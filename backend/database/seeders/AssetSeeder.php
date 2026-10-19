@@ -1,0 +1,123 @@
+<?php
+
+namespace Database\Seeders;
+
+use App\Models\Asset;
+use App\Models\Category;
+use App\Models\Room;
+use App\Models\Team;
+use App\Models\User;
+use Illuminate\Database\Seeder;
+
+class AssetSeeder extends Seeder
+{
+    /**
+     * Seed assets with their categories, locations, teams, and assignments.
+     */
+    public function run(): void
+    {
+        // Rooms are owned by a single unit now, so an asset is looked up inside
+        // its own unit's rooms and inherits that unit.
+        $room = fn (string $name, string $teamSlug) => Room::query()
+            ->where('name', $name)
+            ->where('team_id', Team::query()->where('slug', $teamSlug)->value('id'))
+            ->first()?->id;
+        // Categories are per unit now too, so a code on its own is ambiguous:
+        // the asset's own unit decides which copy of that code it points at.
+        $categoryCode = fn (string $code, string $teamSlug) => Category::query()
+            ->where('code', $code)
+            ->where('team_id', Team::query()->where('slug', $teamSlug)->value('id'))
+            ->first()?->id;
+        $team = fn (string $slug) => Team::query()->where('slug', $slug)->first()?->id;
+        $marketingUser = User::query()->where('email', 'staff@example.com')->first()?->id;
+
+        $assets = [
+            [
+                'asset_code' => 'AST-001',
+                'name' => 'Proyektor Epson',
+                'category_id' => $categoryCode('CAT-ELE', 'development'),
+                'team_id' => $team('development'),
+                'room_id' => $room('Ruang Rapat A', 'development'),
+                'purchase_price' => 4500000,
+                'purchase_date' => '2024-01-15',
+                'purchase_receipt' => 'RCPT-0001',
+                'description' => 'Proyektor untuk ruang rapat.',
+                'condition' => 'GOOD',
+                'usage_status' => 'IN_STORAGE',
+            ],
+            [
+                'asset_code' => 'AST-002',
+                'name' => 'TV 55 Inch',
+                'category_id' => $categoryCode('CAT-ELE', 'development'),
+                'team_id' => $team('development'),
+                'room_id' => $room('Ruang Rapat A', 'development'),
+                'purchase_price' => 7200000,
+                'purchase_date' => '2024-02-20',
+                'purchase_receipt' => 'RCPT-0002',
+                'description' => 'Layar untuk presentasi.',
+                'condition' => 'GOOD',
+                'usage_status' => 'IN_STORAGE',
+            ],
+            [
+                'asset_code' => 'AST-003',
+                'name' => 'Server Rack',
+                'category_id' => $categoryCode('CAT-IT', 'operations'),
+                'team_id' => $team('operations'),
+                'room_id' => $room('Server Room', 'operations'),
+                'purchase_price' => 12500000,
+                'purchase_date' => '2023-11-30',
+                'purchase_receipt' => 'RCPT-0003',
+                'description' => 'Rak server utama.',
+                'condition' => 'GOOD',
+                'usage_status' => 'IN_STORAGE',
+            ],
+            [
+                'asset_code' => 'AST-004',
+                'name' => 'Laptop Dell Latitude',
+                'category_id' => $categoryCode('CAT-IT', 'development'),
+                'team_id' => $team('development'),
+                'room_id' => $room('Ruang Rapat B', 'development'),
+                'assigned_user_id' => $marketingUser,
+                'purchase_price' => 15900000,
+                'purchase_date' => '2025-03-10',
+                'purchase_receipt' => 'RCPT-0004',
+                'description' => 'Laptop kerja tim pengembangan.',
+                'condition' => 'GOOD',
+                'usage_status' => 'IN_USE',
+            ],
+            [
+                'asset_code' => 'AST-005',
+                'name' => 'Kursi Kantor Rusak',
+                'category_id' => $categoryCode('CAT-FUR', 'development'),
+                'team_id' => $team('development'),
+                'room_id' => $room('Gudang', 'development'),
+                'purchase_price' => 850000,
+                'purchase_date' => '2022-05-10',
+                'purchase_receipt' => 'RCPT-0005',
+                'description' => 'Kursi kantor dengan kerusakan pada roda.',
+                'condition' => 'DAMAGED',
+                'usage_status' => 'IN_STORAGE',
+            ],
+            [
+                'asset_code' => 'AST-006',
+                'name' => 'Monitor LG 27 Inch',
+                'category_id' => $categoryCode('CAT-ELE', 'development'),
+                'team_id' => $team('development'),
+                'room_id' => $room('Gudang', 'development'),
+                'purchase_price' => 2900000,
+                'purchase_date' => '2024-08-05',
+                'purchase_receipt' => 'RCPT-0006',
+                'description' => 'Monitor cadangan untuk stok.',
+                'condition' => 'GOOD',
+                'usage_status' => 'IN_STORAGE',
+            ],
+        ];
+
+        foreach ($assets as $asset) {
+            Asset::query()->updateOrCreate(
+                ['asset_code' => $asset['asset_code']],
+                $asset,
+            );
+        }
+    }
+}

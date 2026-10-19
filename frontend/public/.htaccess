@@ -1,0 +1,16 @@
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # SPA routes that collide with real directories must render the app shell.
+    # /assets  -> folder chunk build (Vite assetsDir)
+    # /images  -> folder gambar publik
+    RewriteRule ^assets/?$ index.html [L]
+    RewriteRule ^images/?$ index.html [L]
+
+    # If the requested file/directory actually exists, serve it directly.
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+
+    # Everything else is routed through the SPA entry point.
+    RewriteRule ^ index.html [L]
+</IfModule>
