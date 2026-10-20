@@ -61,7 +61,6 @@ class VehicleAsset extends Model
         'team_id',
         'room_id',
         'assigned_user_id',
-        'supplier_id',
         'placement_date',
     ];
 
@@ -109,16 +108,6 @@ class VehicleAsset extends Model
     public function assignedUser(): BelongsTo
     {
         return $this->belongsTo(User::class, 'assigned_user_id');
-    }
-
-    /**
-     * The supplier/vendor this vehicle was purchased from.
-     *
-     * @return BelongsTo<Supplier, $this>
-     */
-    public function supplier(): BelongsTo
-    {
-        return $this->belongsTo(Supplier::class);
     }
 
     /**

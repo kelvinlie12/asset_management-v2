@@ -29,6 +29,8 @@ class UpdateTeamRequest extends FormRequest
             'name' => ['sometimes', 'string', 'max:255', 'unique:teams,name,'.$team->id],
             'description' => ['sometimes', 'nullable', 'string'],
             'status' => ['sometimes', Rule::in(Team::STATUSES)],
+            'logo' => ['sometimes', 'nullable', 'image', 'mimes:jpeg,png,jpg,webp,gif', 'max:4096'],
+            'remove_logo' => ['sometimes', 'boolean'],
             // Rooms are managed on the rooms page by the unit that owns them.
         ];
     }

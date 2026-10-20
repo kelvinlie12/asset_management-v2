@@ -69,13 +69,13 @@ class OwnerModuleAccessTest extends TestCase
 
     public function test_default_owner_modules_are_asset_damage_and_users(): void
     {
-        $this->assertSame(['assets', 'damages', 'users'], ModuleCatalog::DEFAULT_OWNER_MODULES);
+        $this->assertSame(['assets', 'damages', 'users', 'tasks'], ModuleCatalog::DEFAULT_OWNER_MODULES);
 
         $team = $this->team('Unit A');
         $owner = $this->ownerOf($team);
 
         $this->assertSame(
-            ['assets', 'damages', 'users'],
+            ['assets', 'damages', 'users', 'tasks'],
             $owner->fresh()->getModuleKeys()
         );
     }
@@ -89,14 +89,14 @@ class OwnerModuleAccessTest extends TestCase
         $keuangan = $this->ownerOf($teamB);
 
         $teknik->syncModules(['assets', 'damages', 'network']);
-        $keuangan->syncModules(['assets', 'damages', 'purchases', 'suppliers']);
+        $keuangan->syncModules(['assets', 'damages', 'purchases']);
 
         $this->assertSame(
             ['assets', 'damages', 'network'],
             $teknik->fresh()->getModuleKeys()
         );
         $this->assertSame(
-            ['assets', 'damages', 'purchases', 'suppliers'],
+            ['assets', 'damages', 'purchases'],
             $keuangan->fresh()->getModuleKeys()
         );
     }
@@ -128,7 +128,7 @@ class OwnerModuleAccessTest extends TestCase
         $keuangan = $this->ownerOf($teamB);
 
         $teknik->syncModules(['assets', 'damages', 'network']);
-        $keuangan->syncModules(['assets', 'damages', 'purchases', 'suppliers']);
+        $keuangan->syncModules(['assets', 'damages', 'purchases']);
 
         Sanctum::actingAs($teknik->fresh());
 
@@ -137,12 +137,10 @@ class OwnerModuleAccessTest extends TestCase
         $this->getJson('/api/v1/lookups')->assertOk();
         $this->getJson('/api/v1/network-nodes')->assertOk();
         $this->getJson('/api/v1/purchases')->assertForbidden();
-        $this->getJson('/api/v1/suppliers')->assertForbidden();
 
         Sanctum::actingAs($keuangan->fresh());
 
         $this->getJson('/api/v1/purchases')->assertOk();
-        $this->getJson('/api/v1/suppliers')->assertOk();
         $this->getJson('/api/v1/network-nodes')->assertForbidden();
     }
 
@@ -223,7 +221,9 @@ class OwnerModuleAccessTest extends TestCase
         $response = $this->getJson("/api/v1/users/{$owner->id}/access")->assertOk();
 
         $keys = array_column($response->json('data.modules'), 'key');
-        $this->assertSame(ModuleCatalog::keys(), $keys);
+        // The catalogue lists every module (the API orders it by the sidebar's
+        // menu order, so compare as a set).
+        $this->assertEqualsCanonicalizing(ModuleCatalog::keys(), $keys);
     }
 
     public function test_super_admin_can_rewrite_an_owners_modules(): void
@@ -241,7 +241,7 @@ class OwnerModuleAccessTest extends TestCase
             ->assertJsonPath('data.user.modules', ['assets', 'vehicles']);
 
         $this->assertTrue($owner->fresh()->can('vehicles.view'));
-        $this->assertFalse($owner->fresh()->can('suppliers.view'));
+        $this->assertFalse($owner->fresh()->can('network.view'));
     }
 
     public function test_owner_cannot_change_module_access(): void

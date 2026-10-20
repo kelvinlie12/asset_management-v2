@@ -21,11 +21,13 @@ class ModuleCatalog
     /**
      * Grantable modules, keyed by the value sent from the client.
      *
-     * @var array<string, array{label: string, description: string, permissions: list<string>}>
+     * @var array<string, array{label: string, description: string, group: string, menus: list<string>, permissions: list<string>}>
      */
     public const MODULES = [
         'assets' => [
-            'label' => 'Aset',
+            'label' => 'Data Aset',
+            'group' => 'assets',
+            'menus' => ['Dashboard', 'Asset Data', 'Storage', 'Reports'],
             'description' => 'Data aset, penempatan barang, dashboard, penyimpanan, dan laporan.',
             'permissions' => [
                 'assets.view',
@@ -38,6 +40,8 @@ class ModuleCatalog
         ],
         'damages' => [
             'label' => 'Barang Rusak',
+            'group' => 'assets',
+            'menus' => ['Damaged Items'],
             'description' => 'Pelaporan dan pengelolaan barang rusak unit.',
             'permissions' => [
                 'damages.view',
@@ -48,6 +52,8 @@ class ModuleCatalog
         ],
         'purchases' => [
             'label' => 'Pembelian',
+            'group' => 'assets',
+            'menus' => ['Purchases'],
             'description' => 'Pencatatan pembelian barang unit.',
             'permissions' => [
                 'purchases.view',
@@ -57,6 +63,8 @@ class ModuleCatalog
         ],
         'transfers' => [
             'label' => 'Mutasi Barang',
+            'group' => 'assets',
+            'menus' => ['Asset Transfers'],
             'description' => 'Pemindahan aset antar ruang atau unit.',
             'permissions' => [
                 'transfers.view',
@@ -65,6 +73,8 @@ class ModuleCatalog
         ],
         'categories' => [
             'label' => 'Kategori Barang',
+            'group' => 'assets',
+            'menus' => ['Categories'],
             'description' => 'Master kategori barang.',
             'permissions' => [
                 'categories.view',
@@ -75,6 +85,8 @@ class ModuleCatalog
         ],
         'vehicles' => [
             'label' => 'Kendaraan',
+            'group' => 'vehicles',
+            'menus' => ['Vehicle Data', 'Vehicles per Unit', 'Vehicle Tax'],
             'description' => 'Aset kendaraan dan pajak kendaraan.',
             'permissions' => [
                 'vehicles.view',
@@ -87,18 +99,10 @@ class ModuleCatalog
                 'vehicle_taxes.delete',
             ],
         ],
-        'suppliers' => [
-            'label' => 'Supplier',
-            'description' => 'Master supplier atau vendor.',
-            'permissions' => [
-                'suppliers.view',
-                'suppliers.create',
-                'suppliers.update',
-                'suppliers.delete',
-            ],
-        ],
         'network' => [
             'label' => 'Jaringan FTTH',
+            'group' => 'network',
+            'menus' => ['Topology', 'Network Nodes'],
             'description' => 'Topologi dan node jaringan.',
             'permissions' => [
                 'network.view',
@@ -109,6 +113,8 @@ class ModuleCatalog
         ],
         'rooms' => [
             'label' => 'Ruang',
+            'group' => 'organization',
+            'menus' => ['Rooms'],
             'description' => 'Data ruang milik unit.',
             'permissions' => [
                 'rooms.view',
@@ -119,6 +125,8 @@ class ModuleCatalog
         ],
         'teams' => [
             'label' => 'Unit',
+            'group' => 'organization',
+            'menus' => ['Unit'],
             'description' => 'Melihat dan mengubah profil unit sendiri. Ruangan dikelola sendiri lewat modul Ruangan.',
             'permissions' => [
                 'teams.view',
@@ -128,8 +136,22 @@ class ModuleCatalog
                 'teams.update',
             ],
         ],
+        'work_teams' => [
+            'label' => 'Team',
+            'group' => 'organization',
+            'menus' => ['Team Group'],
+            'description' => 'Master tim kerja (kelompok pengguna aset).',
+            'permissions' => [
+                'work_teams.view',
+                'work_teams.create',
+                'work_teams.update',
+                'work_teams.delete',
+            ],
+        ],
         'users' => [
-            'label' => 'Pengguna Unit',
+            'label' => 'Pengguna',
+            'group' => 'organization',
+            'menus' => ['Users'],
             'description' => 'Mengelola pengguna di dalam unit sendiri.',
             'permissions' => [
                 'users.view',
@@ -140,12 +162,61 @@ class ModuleCatalog
             ],
         ],
         'audit_logs' => [
-            'label' => 'Log Aktivitas',
+            'label' => 'Log Audit',
+            'group' => 'tools',
+            'menus' => ['Audit Log'],
             'description' => 'Riwayat aktivitas unit.',
             'permissions' => [
                 'audit_logs.view',
             ],
         ],
+        'tasks' => [
+            'label' => 'Task',
+            'group' => 'tools',
+            'menus' => ['Task'],
+            'description' => 'Melaporkan bug sistem atau menu dan menindaklanjutinya.',
+            'permissions' => [
+                'tasks.view',
+                'tasks.create',
+                'tasks.update',
+                'tasks.delete',
+            ],
+        ],
+    ];
+
+    /**
+     * Sidebar sections the menus are listed under on the Access Rights screen,
+     * in the order the sidebar shows them. Labels are the sidebar's own.
+     *
+     * @var array<string, string>
+     */
+    public const GROUPS = [
+        'assets' => 'Assets',
+        'vehicles' => 'Vehicles',
+        'network' => 'Network (FTTH)',
+        'organization' => 'Organization',
+        'tools' => 'Tools',
+    ];
+
+    /**
+     * Order of the entries inside the screen, following the sidebar.
+     *
+     * @var list<string>
+     */
+    public const MENU_ORDER = [
+        'assets',
+        'purchases',
+        'transfers',
+        'damages',
+        'categories',
+        'vehicles',
+        'network',
+        'teams',
+        'work_teams',
+        'rooms',
+        'users',
+        'tasks',
+        'audit_logs',
     ];
 
     /**
@@ -158,6 +229,8 @@ class ModuleCatalog
         'damages',
         // Every company manages the staff of its own unit.
         'users',
+        // An owner triages the bug reports filed by their unit.
+        'tasks',
     ];
 
     /**
@@ -272,23 +345,30 @@ class ModuleCatalog
     /**
      * Describe the catalogue for the Access Rights screen.
      *
+     * Each entry is one menu (or a set of sidebar menus that share a single
+     * permission), listed under the sidebar section it belongs to.
+     *
      * @param  list<string>  $selected  module keys the target currently holds
      * @param  list<string>  $grantable  module keys the actor may hand out
-     * @return list<array{key: string, label: string, description: string, default: bool, selected: bool, grantable: bool}>
+     * @return list<array{key: string, label: string, description: string, group: string, group_label: string, menus: list<string>, default: bool, selected: bool, grantable: bool}>
      */
     public static function describe(array $selected, array $grantable): array
     {
+        $order = array_values(array_unique(array_merge(self::MENU_ORDER, self::keys())));
+
         return array_map(
-            static fn (string $key, array $module) => [
+            static fn (string $key) => [
                 'key' => $key,
-                'label' => $module['label'],
-                'description' => $module['description'],
+                'label' => self::MODULES[$key]['label'],
+                'description' => self::MODULES[$key]['description'],
+                'group' => self::MODULES[$key]['group'],
+                'group_label' => self::GROUPS[self::MODULES[$key]['group']] ?? self::MODULES[$key]['group'],
+                'menus' => self::MODULES[$key]['menus'],
                 'default' => in_array($key, self::DEFAULT_OWNER_MODULES, true),
                 'selected' => in_array($key, $selected, true),
                 'grantable' => in_array($key, $grantable, true),
             ],
-            array_keys(self::MODULES),
-            self::MODULES
+            array_values(array_filter($order, static fn (string $key) => self::has($key)))
         );
     }
 }

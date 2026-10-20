@@ -11,9 +11,14 @@ use App\Support\ApiResponse;
 use App\Support\UnitScope;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\File;
 
 class TeamController extends Controller
 {
+    /** Directory (relative to the public path) that holds unit logos. */
+    private const LOGO_DIR = 'uploads/teams';
+
     /**
      * Display a paginated, searchable list of teams.
      */
@@ -67,6 +72,7 @@ class TeamController extends Controller
             'name' => $validated['name'],
             'description' => $validated['description'] ?? null,
             'status' => $validated['status'] ?? Team::STATUS_ACTIVE,
+            'logo' => $request->hasFile('logo') ? $this->storeLogo($request->file('logo')) : null,
         ]);
 
         return ApiResponse::created([
@@ -93,7 +99,17 @@ class TeamController extends Controller
     {
         UnitScope::assertAccess($request->user(), $team->id);
 
-        $team->update($request->validated());
+        $data = collect($request->validated())->except(['logo', 'remove_logo'])->all();
+
+        if ($request->boolean('remove_logo')) {
+            $this->deleteLogo($team->logo);
+            $data['logo'] = null;
+        } elseif ($request->hasFile('logo')) {
+            $this->deleteLogo($team->logo);
+            $data['logo'] = $this->storeLogo($request->file('logo'));
+        }
+
+        $team->update($data);
 
         return ApiResponse::success([
             'team' => new TeamResource($team->fresh()->loadCount('users')->loadCount('rooms')),
@@ -114,8 +130,40 @@ class TeamController extends Controller
         // The unit's own rooms go with it; nothing else points at a deleted unit.
         $team->rooms()->update(['team_id' => null]);
 
+        $this->deleteLogo($team->logo);
+
         $team->delete();
 
         return ApiResponse::noContent('Team deleted successfully.');
+    }
+
+    /**
+     * Move an uploaded logo into the public teams directory.
+     */
+    private function storeLogo(UploadedFile $file): string
+    {
+        $directory = public_path(self::LOGO_DIR);
+        File::ensureDirectoryExists($directory);
+
+        $ext = strtolower($file->guessExtension() ?: 'png');
+        $name = 'logo_'.md5(uniqid((string) random_int(0, PHP_INT_MAX), true)).'.'.$ext;
+        $file->move($directory, $name);
+
+        return self::LOGO_DIR.'/'.$name;
+    }
+
+    /**
+     * Remove a stored logo, but only a file that lives in the teams folder.
+     */
+    private function deleteLogo(?string $path): void
+    {
+        if (! $path || ! str_starts_with($path, self::LOGO_DIR.'/')) {
+            return;
+        }
+
+        $fullPath = public_path($path);
+        if (File::exists($fullPath)) {
+            File::delete($fullPath);
+        }
     }
 }

@@ -7,10 +7,15 @@ use App\Http\Requests\StoreAssetRequest;
 use App\Http\Requests\UpdateAssetRequest;
 use App\Http\Resources\AssetResource;
 use App\Models\Asset;
+use App\Models\AssetDamage;
+use App\Models\Purchase;
+use App\Models\Room;
 use App\Support\ApiResponse;
 use App\Support\UnitScope;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 
 class AssetController extends Controller
@@ -35,7 +40,7 @@ class AssetController extends Controller
 
         $assets = UnitScope::apply(
             Asset::query()
-                ->with(['room', 'category', 'team', 'assignedUser'])
+                ->with(['room', 'category', 'team', 'workTeam', 'assignedUser'])
                 ->when($request->query('search'), function ($query, $search) {
                     $query->where(function ($q) use ($search) {
                         $q->where('asset_code', 'like', "%{$search}%")
@@ -85,11 +90,38 @@ class AssetController extends Controller
             $data['purchase_receipt'] = $this->storeFile($request->file('purchase_receipt'), 'uploads/assets/receipts');
         }
 
-        $asset = Asset::create($data);
+        $asset = $this->createAsset($data);
+
+        DB::transaction(fn () => $this->syncConditionRecords($asset, null, $request));
 
         return ApiResponse::created([
-            'asset' => new AssetResource($asset->load($this->relations())),
+            'asset' => new AssetResource($asset->fresh()->load($this->relations())),
         ], 'Asset created successfully.');
+    }
+
+    /**
+     * Persist a new asset, retrying with a regenerated code if two requests
+     * race for the same code (the unique index rejects the loser).
+     */
+    private function createAsset(array $data): Asset
+    {
+        $attempts = 5;
+
+        for ($attempt = 1; ; $attempt++) {
+            try {
+                return DB::transaction(static fn () => Asset::create($data));
+            } catch (QueryException $e) {
+                if ($attempt >= $attempts || ! $this->isDuplicateAssetCode($e)) {
+                    throw $e;
+                }
+                $data['asset_code'] = Asset::generateAssetCode();
+            }
+        }
+    }
+
+    private function isDuplicateAssetCode(QueryException $e): bool
+    {
+        return str_contains($e->getMessage(), 'asset_code');
     }
 
     /**
@@ -151,7 +183,13 @@ class AssetController extends Controller
             $data['purchase_receipt'] = $this->storeFile($request->file('purchase_receipt'), 'uploads/assets/receipts');
         }
 
+        $previousCondition = $asset->condition;
+
         $asset->update($data);
+
+        DB::transaction(function () use ($asset, $previousCondition, $request) {
+            $this->syncConditionRecords($asset->fresh(), $previousCondition, $request);
+        });
 
         return ApiResponse::success([
             'asset' => new AssetResource($asset->fresh()->load($this->relations())),
@@ -190,6 +228,7 @@ class AssetController extends Controller
             'room',
             'category',
             'team',
+            'workTeam',
             'assignedUser',
             'purchases',
             'assignments',
@@ -197,6 +236,86 @@ class AssetController extends Controller
             'damages',
             'networkNode',
         ];
+    }
+
+    /**
+     * Mirror an asset's condition into the modules that own that state:
+     * a new item shows up in Pembayaran and a damaged one in Barang Rusak.
+     */
+    private function syncConditionRecords(Asset $asset, ?string $previousCondition, Request $request): void
+    {
+        if ($asset->condition === Asset::CONDITION_NEW && $previousCondition !== Asset::CONDITION_NEW) {
+            // Only ever file a single purchase record for one asset.
+            if (! $asset->purchases()->exists()) {
+                $this->recordPurchase($asset);
+            }
+        }
+
+        if ($asset->condition === Asset::CONDITION_DAMAGED && $previousCondition !== Asset::CONDITION_DAMAGED) {
+            $this->recordDamage($asset, $request);
+        }
+    }
+
+    /**
+     * Record a purchase entry for an asset marked as new.
+     */
+    private function recordPurchase(Asset $asset): void
+    {
+        Purchase::create([
+            'purchase_number' => $this->nextPurchaseNumber(),
+            'supplier' => null,
+            'invoice_number' => null,
+            'purchase_date' => $asset->purchase_date?->toDateString() ?? now()->toDateString(),
+            'amount' => $asset->purchase_price ?? 0,
+            'proof_path' => null,
+            'notes' => $asset->description,
+            'asset_id' => $asset->id,
+        ]);
+    }
+
+    /**
+     * Record a damage report for an asset marked as damaged and send the asset
+     * to the warehouse, matching the behaviour of the Barang Rusak module.
+     */
+    private function recordDamage(Asset $asset, Request $request): void
+    {
+        $warehouse = Room::query()
+            ->where('is_storage', true)
+            ->orderBy('id')
+            ->first();
+
+        AssetDamage::create([
+            'asset_id' => $asset->id,
+            'room_id' => $asset->room_id ?? $warehouse?->id,
+            'damage_date' => now()->toDateString(),
+            'user_id' => null,
+            'responsible_id' => null,
+            'description' => $asset->description ?: 'Aset ditandai rusak dari Data Aset.',
+            'photo_path' => null,
+            'notes' => null,
+            'performed_by_id' => $request->user()?->id,
+        ]);
+
+        $asset->update([
+            'condition' => Asset::CONDITION_DAMAGED,
+            'usage_status' => Asset::USAGE_IN_STORAGE,
+            'room_id' => $warehouse?->id ?? $asset->room_id,
+            'assigned_user_id' => null,
+        ]);
+    }
+
+    /**
+     * Generate the next sequential purchase number (e.g. PCH-0001).
+     */
+    private function nextPurchaseNumber(): string
+    {
+        $max = (int) substr(Purchase::query()->where('purchase_number', 'like', 'PCH-%')->max('purchase_number') ?? '', 4);
+
+        do {
+            $number = 'PCH-'.str_pad(++$max, 4, '0', STR_PAD_LEFT);
+        } while (Purchase::query()->where('purchase_number', $number)->exists());
+
+        return $number;
     }
 
     /**

@@ -24,11 +24,14 @@ class DatabaseSeeder extends Seeder
         // they run before RoomSeeder, which fills in every unit's rooms.
         $this->call(OwnerSeeder::class);
         $this->call(RoomSeeder::class);
+        $this->call(WorkTeamSeeder::class);
         $this->call(AssetSeeder::class);
         $this->call(PurchaseSeeder::class);
         $this->call(AssetAssignmentSeeder::class);
-        $this->call(SupplierSeeder::class);
         $this->call(VehicleSeeder::class);
         $this->call(NetworkNodeSeeder::class);
+        // Runs last: it reuses the units, rooms, and categories above and then
+        // floods every module with extra Faker-driven rows for testing.
+        $this->call(BulkDummySeeder::class);
     }
 }

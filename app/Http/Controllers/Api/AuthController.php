@@ -142,6 +142,11 @@ class AuthController extends Controller
     {
         $data = $user->toArray();
 
+        $user->loadMissing('team');
+        $data['team'] = $user->team
+            ? (new \App\Http\Resources\TeamResource($user->team))->resolve()
+            : null;
+
         $data['avatar'] = $user->avatar;
         $data['avatar_url'] = $user->avatar ? url($user->avatar) : null;
 

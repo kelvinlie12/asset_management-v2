@@ -3,7 +3,6 @@
 namespace Database\Seeders;
 
 use App\Models\Room;
-use App\Models\Supplier;
 use App\Models\Team;
 use App\Models\User;
 use App\Models\VehicleAsset;
@@ -46,7 +45,6 @@ class VehicleSeeder extends Seeder
     {
         $teams = Team::query()->pluck('id', 'slug');
         $owners = User::query()->pluck('id', 'email');
-        $suppliers = Supplier::query()->pluck('id', 'name');
 
         $today = Carbon::today();
 
@@ -66,7 +64,6 @@ class VehicleSeeder extends Seeder
                 'last_tax_amount' => 1250000,
                 'tax_due_date' => $today->copy()->addYear()->toDateString(),
                 'tax_status' => VehicleAsset::TAX_PAID,
-                'supplier_id' => $suppliers['PT Astra Honda Motor'] ?? null,
                 'description' => 'Motor lapangan teknisi unit teknik.',
                 'tax' => [
                     'tax_due_date' => $today->copy()->subMonths(11)->toDateString(),
@@ -93,7 +90,6 @@ class VehicleSeeder extends Seeder
                 'last_tax_amount' => null,
                 'tax_due_date' => $today->copy()->addDays(12)->toDateString(),
                 'tax_status' => VehicleAsset::TAX_UNPAID,
-                'supplier_id' => $suppliers['PT Astra Honda Motor'] ?? null,
                 'description' => 'Motor kedua tim lapangan teknik.',
                 'tax' => [
                     'tax_due_date' => $today->copy()->addDays(12)->toDateString(),
@@ -120,7 +116,6 @@ class VehicleSeeder extends Seeder
                 'last_tax_amount' => null,
                 'tax_due_date' => $today->copy()->addDays(3)->toDateString(),
                 'tax_status' => VehicleAsset::TAX_UNPAID,
-                'supplier_id' => $suppliers['PT Yamaha Indonesia Motor Manufacturing'] ?? null,
                 'description' => 'Motor pengantar tim unit operasional.',
                 'tax' => [
                     'tax_due_date' => $today->copy()->addDays(3)->toDateString(),
@@ -147,7 +142,6 @@ class VehicleSeeder extends Seeder
                 'last_tax_amount' => 640000,
                 'tax_due_date' => $today->copy()->addMonths(6)->toDateString(),
                 'tax_status' => VehicleAsset::TAX_PAID,
-                'supplier_id' => $suppliers['PT Yamaha Indonesia Motor Manufacturing'] ?? null,
                 'description' => 'Motor operasional harian.',
                 'tax' => [
                     'tax_due_date' => $today->copy()->subMonths(6)->toDateString(),
@@ -174,7 +168,6 @@ class VehicleSeeder extends Seeder
                 'last_tax_amount' => null,
                 'tax_due_date' => $today->copy()->addDays(25)->toDateString(),
                 'tax_status' => VehicleAsset::TAX_UNPAID,
-                'supplier_id' => $suppliers['PT Suzuki Indomobil Motor'] ?? null,
                 'description' => 'Motor cadangan armada operasional.',
                 'tax' => [
                     'tax_due_date' => $today->copy()->addDays(25)->toDateString(),
@@ -201,7 +194,6 @@ class VehicleSeeder extends Seeder
                 'last_tax_amount' => null,
                 'tax_due_date' => $today->copy()->subDays(20)->toDateString(),
                 'tax_status' => VehicleAsset::TAX_UNPAID,
-                'supplier_id' => $suppliers['PT Suzuki Indomobil Motor'] ?? null,
                 'description' => 'Pajak sudah melewati jatuh tempo.',
                 'tax' => [
                     'tax_due_date' => $today->copy()->subDays(20)->toDateString(),
@@ -228,7 +220,6 @@ class VehicleSeeder extends Seeder
                 'last_tax_amount' => 1250000,
                 'tax_due_date' => $today->copy()->addMonths(8)->toDateString(),
                 'tax_status' => VehicleAsset::TAX_PAID,
-                'supplier_id' => $suppliers['PT Astra Honda Motor'] ?? null,
                 'description' => 'Motor pengantar berkas keuangan.',
                 'tax' => [
                     'tax_due_date' => $today->copy()->subMonths(4)->toDateString(),

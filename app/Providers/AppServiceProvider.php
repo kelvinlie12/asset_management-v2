@@ -10,7 +10,6 @@ use App\Models\Category;
 use App\Models\NetworkNode;
 use App\Models\Purchase;
 use App\Models\Room;
-use App\Models\Supplier;
 use App\Models\Team;
 use App\Models\User;
 use App\Models\VehicleAsset;
@@ -50,7 +49,6 @@ class AppServiceProvider extends ServiceProvider
             Purchase::class,
             Role::class,
             Room::class,
-            Supplier::class,
             Team::class,
             User::class,
             VehicleAsset::class,

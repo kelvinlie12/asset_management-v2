@@ -28,6 +28,7 @@ class Team extends Model
         'name',
         'slug',
         'description',
+        'logo',
         'status',
     ];
 

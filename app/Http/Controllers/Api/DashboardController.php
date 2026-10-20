@@ -56,7 +56,7 @@ class DashboardController extends Controller
             ->get()
             ->map(fn (Category $category) => [
                 'label' => $category->name,
-                'value' => $category->assets_count,
+                'value' => (int) $category->assets_count,
             ])
             ->values()
             ->all();

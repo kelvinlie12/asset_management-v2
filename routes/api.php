@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\AssetDamageController;
 use App\Http\Controllers\Api\AssetTransferController;
 use App\Http\Controllers\Api\AuditLogController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\BrandingController;
 use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\LookupController;
@@ -14,12 +15,13 @@ use App\Http\Controllers\Api\PermissionController;
 use App\Http\Controllers\Api\PurchaseController;
 use App\Http\Controllers\Api\RoleController;
 use App\Http\Controllers\Api\RoomController;
-use App\Http\Controllers\Api\SupplierController;
+use App\Http\Controllers\Api\TaskController;
 use App\Http\Controllers\Api\TeamController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\VehicleController;
 use App\Http\Controllers\Api\VehicleTaxController;
 use App\Http\Controllers\Api\VehicleTaxReminderController;
+use App\Http\Controllers\Api\WorkTeamController;
 use App\Support\ApiResponse;
 use Illuminate\Support\Facades\Route;
 
@@ -31,7 +33,14 @@ Route::prefix('v1')->group(function () {
     Route::post('/auth/login', [AuthController::class, 'login'])
         ->middleware('throttle:5,1');
 
+    // Company branding. Reading is public so the logo also shows on the
+    // sign-in screen; changing it is restricted to an owner/super admin inside
+    // the controller.
+    Route::get('/branding', [BrandingController::class, 'show']);
+
     Route::middleware('auth:sanctum')->group(function () {
+        Route::post('/branding', [BrandingController::class, 'update']);
+
         Route::post('/auth/logout', [AuthController::class, 'logout']);
         Route::get('/profile', [AuthController::class, 'profile']);
         Route::put('/profile', [AuthController::class, 'updateProfile'])
@@ -64,6 +73,13 @@ Route::prefix('v1')->group(function () {
         Route::get('/teams/{team}', [TeamController::class, 'show'])->middleware('permission:teams.view');
         Route::put('/teams/{team}', [TeamController::class, 'update'])->middleware('permission:teams.update');
 Route::delete('/teams/{team}', [TeamController::class, 'destroy'])->middleware('permission:teams.delete');
+
+        // Work Team (Tim kerja) management: a working group inside a unit.
+        Route::get('/work-teams', [WorkTeamController::class, 'index'])->middleware('permission:work_teams.view');
+        Route::post('/work-teams', [WorkTeamController::class, 'store'])->middleware('permission:work_teams.create');
+        Route::get('/work-teams/{workTeam}', [WorkTeamController::class, 'show'])->middleware('permission:work_teams.view');
+        Route::put('/work-teams/{workTeam}', [WorkTeamController::class, 'update'])->middleware('permission:work_teams.update');
+        Route::delete('/work-teams/{workTeam}', [WorkTeamController::class, 'destroy'])->middleware('permission:work_teams.delete');
 
         // Room (Ruangan) management
         Route::get('/rooms', [RoomController::class, 'index'])->middleware('permission:rooms.view');
@@ -129,13 +145,6 @@ Route::get('/vehicles', [VehicleController::class, 'index'])->middleware('permis
         Route::put('/vehicles/{vehicle}/taxes/{vehicleTax}', [VehicleTaxController::class, 'update'])->middleware('permission:vehicle_taxes.update');
         Route::delete('/vehicles/{vehicle}/taxes/{vehicleTax}', [VehicleTaxController::class, 'destroy'])->middleware('permission:vehicle_taxes.delete');
 
-        // Supplier / Vendor master data
-        Route::get('/suppliers', [SupplierController::class, 'index'])->middleware('permission:suppliers.view');
-        Route::post('/suppliers', [SupplierController::class, 'store'])->middleware('permission:suppliers.create');
-        Route::get('/suppliers/{supplier}', [SupplierController::class, 'show'])->middleware('permission:suppliers.view');
-        Route::put('/suppliers/{supplier}', [SupplierController::class, 'update'])->middleware('permission:suppliers.update');
-        Route::delete('/suppliers/{supplier}', [SupplierController::class, 'destroy'])->middleware('permission:suppliers.delete');
-
         // FTTH Network (Jaringan FTTH) module
         Route::get('/network-nodes/available-assets', [NetworkNodeController::class, 'availableAssets'])->middleware('permission:network.view');
         Route::get('/network-nodes/tree', [NetworkNodeController::class, 'tree'])->middleware('permission:network.view');
@@ -168,5 +177,25 @@ Route::get('/vehicles', [VehicleController::class, 'index'])->middleware('permis
         // Audit log (Log Aktivitas)
         Route::get('/audit-logs', [AuditLogController::class, 'index'])->middleware('permission:audit_logs.view');
         Route::get('/audit-logs/{auditLog}', [AuditLogController::class, 'show'])->middleware('permission:audit_logs.view');
+
+        // Task (laporan bug sistem / menu). A report belongs to a unit; a super
+        // admin — or a user handed `tasks.manage_all` — sees and works every
+        // unit's reports.
+        Route::get('/tasks', [TaskController::class, 'index'])->middleware('permission:tasks.view|tasks.manage_all');
+        Route::post('/tasks', [TaskController::class, 'store'])->middleware('permission:tasks.create');
+        // Declared before the {task} routes so "assignable-users" is not read as
+        // a task id. Anyone filing a report may point it at a user, so viewing
+        // the roster only needs tasks.view.
+        Route::get('/tasks/assignable-users', [TaskController::class, 'assignableUsers'])->middleware('permission:tasks.view|tasks.manage_all');
+        Route::get('/tasks/{task}', [TaskController::class, 'show'])->middleware('permission:tasks.view|tasks.manage_all');
+        // Discussion: anyone who can see the report may read/post; the author or
+        // an owner/admin may delete a message.
+        Route::post('/tasks/{task}/comments', [TaskController::class, 'storeComment'])->middleware('permission:tasks.view|tasks.manage_all');
+        Route::put('/tasks/{task}/comments/{comment}', [TaskController::class, 'updateComment'])->middleware('permission:tasks.view|tasks.manage_all');
+        Route::delete('/tasks/{task}/comments/{comment}', [TaskController::class, 'destroyComment'])->middleware('permission:tasks.view|tasks.manage_all');
+        // No permission middleware: UpdateTaskRequest authorises either an
+        // owner/admin (tasks.update) or the user the report is assigned to.
+        Route::put('/tasks/{task}', [TaskController::class, 'update']);
+        Route::delete('/tasks/{task}', [TaskController::class, 'destroy'])->middleware('permission:tasks.delete');
     });
 });

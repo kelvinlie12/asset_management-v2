@@ -46,6 +46,11 @@ class RolePermissionSeeder extends Seeder
         'teams.create',
         'teams.update',
         'teams.delete',
+        // Work Team (Tim kerja) management
+        'work_teams.view',
+        'work_teams.create',
+        'work_teams.update',
+        'work_teams.delete',
         // Room (Ruangan) management
         'rooms.view',
         'rooms.create',
@@ -86,11 +91,6 @@ class RolePermissionSeeder extends Seeder
         'vehicle_taxes.create',
         'vehicle_taxes.update',
         'vehicle_taxes.delete',
-        // Supplier / Vendor
-        'suppliers.view',
-        'suppliers.create',
-        'suppliers.update',
-        'suppliers.delete',
         // FTTH Network (Jaringan FTTH)
         'network.view',
         'network.create',
@@ -98,6 +98,13 @@ class RolePermissionSeeder extends Seeder
         'network.delete',
         // Audit log (Log Aktivitas)
         'audit_logs.view',
+        // Task (laporan bug sistem / menu)
+        'tasks.view',
+        'tasks.create',
+        'tasks.update',
+        'tasks.delete',
+        // Cross-unit grant: see and work on every unit's task reports.
+        'tasks.manage_all',
     ];
 
     /**
@@ -110,12 +117,19 @@ class RolePermissionSeeder extends Seeder
             'profile.view',
             'profile.update',
             'profile.password',
+            // Everyone may open the Task menu and file a report.
+            'tasks.view',
+            'tasks.create',
         ],
         User::ROLE_STAFF => [
             'profile.view',
             'profile.update',
             'profile.password',
             'teams.view',
+            'work_teams.view',
+            'work_teams.create',
+            'work_teams.update',
+            'work_teams.delete',
             'rooms.view',
             'categories.view',
             'assets.view',
@@ -125,6 +139,8 @@ class RolePermissionSeeder extends Seeder
             'damages.view',
             'vehicles.view',
             'network.view',
+            'tasks.view',
+            'tasks.create',
         ],
         User::ROLE_ADMIN => [
             'profile.view',
@@ -139,6 +155,10 @@ class RolePermissionSeeder extends Seeder
             'teams.create',
             'teams.update',
             'teams.delete',
+            'work_teams.view',
+            'work_teams.create',
+            'work_teams.update',
+            'work_teams.delete',
             'rooms.view',
             'rooms.create',
             'rooms.update',
@@ -170,15 +190,15 @@ class RolePermissionSeeder extends Seeder
             'vehicle_taxes.create',
             'vehicle_taxes.update',
             'vehicle_taxes.delete',
-            'suppliers.view',
-            'suppliers.create',
-            'suppliers.update',
-            'suppliers.delete',
             'network.view',
             'network.create',
             'network.update',
             'network.delete',
             'audit_logs.view',
+            'tasks.view',
+            'tasks.create',
+            'tasks.update',
+            'tasks.delete',
         ],
     ];
 
@@ -214,6 +234,18 @@ class RolePermissionSeeder extends Seeder
                     $user->syncModules(ModuleCatalog::DEFAULT_OWNER_MODULES);
                 }
             });
+
+        // Existing unit admins should be able to manage work teams too. Query
+        // the permission rows directly so a stale registrar cache never hides
+        // the freshly created permissions.
+        $workTeamPermissions = Permission::query()
+            ->whereIn('name', ['work_teams.view', 'work_teams.create', 'work_teams.update', 'work_teams.delete'])
+            ->get();
+
+        User::query()
+            ->where('role', User::ROLE_ADMIN)
+            ->get()
+            ->each(fn (User $user) => $user->givePermissionTo($workTeamPermissions));
 
         // Drop the cached snapshot so subsequent lookups see the current rows.
         app(PermissionRegistrar::class)->forgetCachedPermissions();

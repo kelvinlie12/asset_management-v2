@@ -35,7 +35,7 @@ class VehicleTaxReminder
         $query = UnitScope::apply(VehicleAsset::query(), $user);
 
         $vehicles = $query
-            ->with(['team', 'room', 'assignedUser', 'supplier'])
+            ->with(['team', 'room', 'assignedUser'])
             ->get();
 
         $summary = [

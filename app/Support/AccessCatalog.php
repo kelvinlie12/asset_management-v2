@@ -157,6 +157,16 @@ class AccessCatalog
                     ],
                 ],
                 [
+                    'key' => 'work_teams',
+                    'label' => 'Team (Tim Kerja)',
+                    'actions' => [
+                        'view' => 'work_teams.view',
+                        'create' => 'work_teams.create',
+                        'update' => 'work_teams.update',
+                        'delete' => 'work_teams.delete',
+                    ],
+                ],
+                [
                     'key' => 'rooms',
                     'label' => 'Ruang',
                     'actions' => [
@@ -165,18 +175,7 @@ class AccessCatalog
                         'update' => 'rooms.update',
                         'delete' => 'rooms.delete',
                     ],
-                ],
-                [
-                    'key' => 'suppliers',
-                    'label' => 'Supplier',
-                    'actions' => [
-                        'view' => 'suppliers.view',
-                        'create' => 'suppliers.create',
-                        'update' => 'suppliers.update',
-                        'delete' => 'suppliers.delete',
-                    ],
-                ],
-                [
+                ],                [
                     'key' => 'users',
                     'label' => 'Pengguna Unit',
                     'actions' => [
@@ -222,6 +221,24 @@ class AccessCatalog
                 ],
             ],
         ],
+        [
+            'key' => 'support',
+            'label' => 'Dukungan',
+            'features' => [
+                [
+                    'key' => 'tasks',
+                    'label' => 'Task / Laporan Bug',
+                    'actions' => [
+                        'view' => 'tasks.view',
+                        'create' => 'tasks.create',
+                        'update' => 'tasks.update',
+                        'delete' => 'tasks.delete',
+                        // Cross-unit grant: see and work on every unit's reports.
+                        'manage_all' => 'tasks.manage_all',
+                    ],
+                ],
+            ],
+        ],
     ];
 
     /**
@@ -263,6 +280,30 @@ class AccessCatalog
             $permissions,
             static fn ($permission) => is_string($permission) && in_array($permission, $known, true)
         )));
+    }
+
+    /**
+     * Every grantable permission as one flat, alphabetical list, for the
+     * Access Rights screen. There is no module or menu grouping: each
+     * permission is its own switch.
+     *
+     * @param  list<string>  $held  permissions the target currently holds
+     * @param  list<string>  $grantable  permissions the actor may hand out
+     * @return list<array{name: string, selected: bool, grantable: bool}>
+     */
+    public static function describePermissions(array $held, array $grantable): array
+    {
+        $names = self::permissionNames();
+        sort($names);
+
+        return array_map(
+            static fn (string $name) => [
+                'name' => $name,
+                'selected' => in_array($name, $held, true),
+                'grantable' => in_array($name, $grantable, true),
+            ],
+            $names
+        );
     }
 
     /**

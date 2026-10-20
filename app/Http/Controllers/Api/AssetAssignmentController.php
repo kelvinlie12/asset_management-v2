@@ -66,6 +66,8 @@ class AssetAssignmentController extends Controller
             ]);
         }
 
+        $validated['team_id'] = UnitScope::resolveTeamId($request->user(), $validated['team_id'] ?? null);
+
         $assignment = DB::transaction(function () use ($validated, $asset) {
             $assignment = AssetAssignment::create([
                 'asset_id' => $asset->id,

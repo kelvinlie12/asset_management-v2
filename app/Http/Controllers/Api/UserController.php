@@ -11,6 +11,7 @@ use App\Http\Requests\UpdateUserAccessRequest;
 use App\Http\Requests\UpdateUserRequest;
 use App\Http\Resources\UserResource;
 use App\Models\User;
+use App\Support\AccessCatalog;
 use App\Support\ModuleCatalog;
 use App\Support\UnitScope;
 use App\Support\ApiResponse;
@@ -258,6 +259,11 @@ class UserController extends Controller
                 ModuleCatalog::heldBy($user->getRoleAbilities()),
                 $this->grantableModules($actor),
             ),
+            // Every permission on its own, with no module or menu grouping.
+            'permissions' => AccessCatalog::describePermissions(
+                $user->getRoleAbilities(),
+                $this->grantablePermissions($actor),
+            ),
             'editable' => $actor->can('manageAccess', $user),
         ]);
     }
@@ -278,6 +284,27 @@ class UserController extends Controller
         }
 
         return ModuleCatalog::grantableBy($actor->getRoleAbilities());
+    }
+
+    /**
+     * The individual permissions the acting user may hand down.
+     *
+     * A super admin can grant any catalogue permission. Everyone else hands
+     * down exactly the permissions they personally hold, minus the reserved
+     * ones (`users.manage_access`).
+     *
+     * @return list<string>
+     */
+    private function grantablePermissions(User $actor): array
+    {
+        if ($actor->isSuperAdmin()) {
+            return AccessCatalog::permissionNames();
+        }
+
+        return array_values(array_diff(
+            array_intersect(AccessCatalog::permissionNames(), $actor->getRoleAbilities()),
+            AccessCatalog::NOT_DELEGATABLE,
+        ));
     }
 
     /**
@@ -302,6 +329,36 @@ class UserController extends Controller
         }
 
         $actor = $request->user();
+
+        // Individual permissions: each one is switched on or off by itself.
+        if ($request->usesPermissions()) {
+            $desired = $request->permissionNames();
+
+            if (! $actor->isSuperAdmin()) {
+                $grantable = $this->grantablePermissions($actor);
+                // Permissions the actor cannot administer stay as they are.
+                $untouchable = array_values(array_diff(
+                    array_intersect(AccessCatalog::permissionNames(), $user->getRoleAbilities()),
+                    $grantable,
+                    AccessCatalog::NOT_DELEGATABLE,
+                ));
+
+                $desired = array_values(array_unique(array_merge(
+                    array_intersect($desired, $grantable),
+                    $untouchable,
+                )));
+            }
+
+            $user->syncAccessPermissions($desired);
+
+            app(PermissionRegistrar::class)->forgetCachedPermissions();
+            $user->tokens()->delete();
+
+            return ApiResponse::success([
+                'user' => new UserResource($user->fresh()->load('team')),
+            ], 'Hak akses pengguna berhasil diperbarui.');
+        }
+
         $desired = $request->moduleKeys();
 
         if (! $actor->isSuperAdmin()) {

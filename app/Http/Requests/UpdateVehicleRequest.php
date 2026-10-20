@@ -50,7 +50,6 @@ public function rules(): array
             'team_id' => ['sometimes', 'nullable', Rule::exists('teams', 'id')],
 'room_id' => ['sometimes', 'nullable', Rule::exists('rooms', 'id'), new RoomBelongsToUnit($this->user(), $owningTeamId)],
             'assigned_user_id' => ['sometimes', 'nullable', Rule::exists('users', 'id'), new UserBelongsToUnit($this->user(), $owningTeamId)],
-            'supplier_id' => ['sometimes', 'nullable', Rule::exists('suppliers', 'id')],
         ];
     }
 

@@ -7,17 +7,26 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Validation\ValidationException;
 
 class Asset extends Model
 {
     use HasFactory;
 
+    public const CONDITION_NEW = 'NEW';
+    public const CONDITION_USED = 'USED';
+    public const CONDITION_REFURBISHED = 'REFURBISHED';
+
+    // "GOOD" is kept for assets recorded before the four conditions below existed.
     public const CONDITION_GOOD = 'GOOD';
     public const CONDITION_DAMAGED = 'DAMAGED';
 
     public const CONDITIONS = [
-        self::CONDITION_GOOD,
+        self::CONDITION_NEW,
+        self::CONDITION_USED,
         self::CONDITION_DAMAGED,
+        self::CONDITION_REFURBISHED,
+        self::CONDITION_GOOD,
     ];
 
     public const USAGE_IN_USE = 'IN_USE';
@@ -46,6 +55,7 @@ class Asset extends Model
         'condition',
         'usage_status',
         'team_id',
+        'work_team_id',
         'room_id',
         'assigned_user_id',
     ];
@@ -69,18 +79,18 @@ class Asset extends Model
      */
     public static function generateAssetCode(): string
     {
-        $latest = static::query()
-            ->orderByDesc('id')
-            ->first();
+        $max = static::query()
+            ->where('asset_code', 'like', 'AST-%')
+            ->pluck('asset_code')
+            ->reduce(function (int $carry, string $code): int {
+                if (preg_match('/^AST-(\d+)$/i', $code, $m)) {
+                    return max($carry, (int) $m[1]);
+                }
 
-        $number = 1;
-        if ($latest && $latest->asset_code) {
-            if (preg_match('/^AST-(\d+)$/i', $latest->asset_code, $m)) {
-                $number = (int) $m[1] + 1;
-            }
-        }
+                return $carry;
+            }, 0);
 
-        return 'AST-' . str_pad((string) $number, 3, '0', STR_PAD_LEFT);
+        return 'AST-' . str_pad((string) ($max + 1), 3, '0', STR_PAD_LEFT);
     }
 
     /**
@@ -121,6 +131,16 @@ class Asset extends Model
     public function assignedUser(): BelongsTo
     {
         return $this->belongsTo(User::class, 'assigned_user_id');
+    }
+
+    /**
+     * The team (working group) that uses this asset.
+     *
+     * @return BelongsTo<WorkTeam, $this>
+     */
+    public function workTeam(): BelongsTo
+    {
+        return $this->belongsTo(WorkTeam::class, 'work_team_id');
     }
 
     /**

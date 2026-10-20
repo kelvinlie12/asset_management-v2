@@ -86,10 +86,10 @@ class UserAccessMatrixTest extends TestCase
         $modules = $this->modules($response->json('data.modules'));
 
         // The staff reaches the assets module (role seeded assets.view) and the
-        // owner is allowed to hand assets down; suppliers is out of reach.
+        // owner is allowed to hand assets down; vehicles is out of reach.
         $this->assertTrue($modules['assets']['selected']);
         $this->assertTrue($modules['assets']['grantable']);
-        $this->assertFalse($modules['suppliers']['grantable']);
+        $this->assertFalse($modules['vehicles']['grantable']);
     }
 
     public function test_owner_can_set_a_module_matrix_independent_of_role(): void
@@ -172,10 +172,10 @@ class UserAccessMatrixTest extends TestCase
 
         // The owner of a unit starts from the modules a super admin hands
         // them (assets, damages, users). Everything inside those modules can
-        // be passed down; a module they were never given - suppliers - stays
+        // be passed down; a module they were never given - audit_logs - stays
         // out of reach and the reserved `users.manage_access` never travels.
         $this->putJson("/api/v1/users/{$staff->id}/access", [
-            'modules' => ['assets', 'damages', 'users', 'suppliers', 'network'],
+            'modules' => ['assets', 'damages', 'users', 'audit_logs'],
         ])->assertOk();
 
         $fresh = $staff->fresh();
@@ -184,7 +184,7 @@ class UserAccessMatrixTest extends TestCase
         $this->assertTrue($fresh->can('damages.create'));
         $this->assertTrue($fresh->can('users.delete'));
         $this->assertFalse($fresh->can('users.manage_access'));
-        $this->assertFalse($fresh->can('suppliers.view'));
+        $this->assertFalse($fresh->can('audit_logs.view'));
     }
 
     public function test_owner_cannot_manage_a_user_from_another_unit(): void
@@ -347,10 +347,10 @@ class UserAccessMatrixTest extends TestCase
 
         $this->getJson("/api/v1/users/{$staff->id}/access")->assertOk();
 
-        // assets and users are the owner's to give; suppliers is not held and
+        // assets and users are the owner's to give; audit_logs is not held and
         // the reserved manage-access flag never travels with the users module.
         $this->putJson("/api/v1/users/{$staff->id}/access", [
-            'modules' => ['assets', 'users', 'suppliers'],
+            'modules' => ['assets', 'users', 'audit_logs'],
         ])->assertOk();
 
         $fresh = $staff->fresh();
@@ -358,7 +358,7 @@ class UserAccessMatrixTest extends TestCase
         $this->assertTrue($fresh->can('assets.view'));
         $this->assertTrue($fresh->can('users.view'));
         $this->assertFalse($fresh->can('users.manage_access'));
-        $this->assertFalse($fresh->can('suppliers.view'));
+        $this->assertFalse($fresh->can('audit_logs.view'));
     }
 
     public function test_granting_a_module_creates_missing_permission_rows(): void
@@ -368,21 +368,21 @@ class UserAccessMatrixTest extends TestCase
 
         // Simulate a production database that was never re-seeded after a new
         // permission was added to the catalogue.
-        Permission::query()->where('name', 'suppliers.view')->delete();
+        Permission::query()->where('name', 'vehicles.view')->delete();
         app(PermissionRegistrar::class)->forgetCachedPermissions();
         $this->assertFalse(
-            Permission::query()->where('name', 'suppliers.view')->exists()
+            Permission::query()->where('name', 'vehicles.view')->exists()
         );
 
         Sanctum::actingAs($this->superAdmin());
 
         $this->putJson("/api/v1/users/{$owner->id}/access", [
-            'modules' => ['assets', 'suppliers'],
+            'modules' => ['assets', 'vehicles'],
         ])->assertOk();
 
-        $this->assertTrue($owner->fresh()->can('suppliers.view'));
+        $this->assertTrue($owner->fresh()->can('vehicles.view'));
         $this->assertTrue(
-            Permission::query()->where('name', 'suppliers.view')->exists()
+            Permission::query()->where('name', 'vehicles.view')->exists()
         );
     }
 }

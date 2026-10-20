@@ -87,7 +87,7 @@ class OwnerSeeder extends Seeder
                     ['AST-OWN-KEU-04', 'Laptop Akuntansi', 'CAT-IT', 13200000, 'GOOD', 'IN_STORAGE'],
                 ],
                 // Keuangan: administrasi, pembelian, dan vendor.
-                'modules' => ['assets', 'damages', 'purchases', 'suppliers', 'categories', 'users'],
+                'modules' => ['assets', 'damages', 'purchases', 'categories', 'users'],
             ],
         ];
 

@@ -8,6 +8,7 @@ use App\Models\Category;
 use App\Models\Room;
 use App\Models\Team;
 use App\Models\User;
+use App\Models\WorkTeam;
 use App\Support\ApiResponse;
 use App\Support\UnitScope;
 use Illuminate\Http\JsonResponse;
@@ -56,6 +57,13 @@ class LookupController extends Controller
             ->orderBy('name')
             ->get(['id', 'name', 'role', 'team_id']);
 
+        // Working groups the asset can be marked as used by.
+        $workTeams = WorkTeam::query()
+            ->where('status', WorkTeam::STATUS_ACTIVE)
+            ->when($unitScoped, fn ($q) => $q->where('team_id', $user->team_id))
+            ->orderBy('name')
+            ->get(['id', 'name', 'team_id']);
+
         $assets = Asset::query()
             ->when($unitScoped, fn ($q) => $q->where('team_id', $user->team_id))
             ->orderBy('name')
@@ -67,6 +75,7 @@ class LookupController extends Controller
             'teams' => $teams,
             'users' => $people,
             'assets' => $assets,
+            'work_teams' => $workTeams,
         ]);
     }
 }

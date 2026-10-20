@@ -25,7 +25,7 @@ class VehicleController extends Controller
         $perPage = min(max($perPage, 1), 100);
 
         $vehicles = UnitScope::apply(VehicleAsset::query(), $request->user())
-            ->with(['team', 'room', 'assignedUser', 'supplier'])
+            ->with(['team', 'room', 'assignedUser'])
             ->when($request->query('search'), function ($query, $search) {
                 $query->where(function ($q) use ($search) {
                     $q->where('asset_code', 'like', "%{$search}%")
@@ -164,7 +164,7 @@ class VehicleController extends Controller
         $vehicle = VehicleAsset::create($validated);
 
         return ApiResponse::created([
-            'vehicle' => new VehicleResource($vehicle->load(['team', 'room', 'assignedUser', 'supplier'])),
+            'vehicle' => new VehicleResource($vehicle->load(['team', 'room', 'assignedUser'])),
         ], 'Vehicle asset created successfully.');
     }
 
@@ -176,7 +176,7 @@ class VehicleController extends Controller
         UnitScope::assertAccess($request->user(), $vehicle->team_id);
 
         return ApiResponse::success([
-            'vehicle' => new VehicleResource($vehicle->load(['team', 'room', 'assignedUser', 'supplier'])),
+            'vehicle' => new VehicleResource($vehicle->load(['team', 'room', 'assignedUser'])),
         ]);
     }
 
@@ -211,7 +211,7 @@ class VehicleController extends Controller
         $vehicle->update($data);
 
         return ApiResponse::success([
-            'vehicle' => new VehicleResource($vehicle->fresh()->load(['team', 'room', 'assignedUser', 'supplier'])),
+            'vehicle' => new VehicleResource($vehicle->fresh()->load(['team', 'room', 'assignedUser'])),
         ], 'Vehicle asset updated successfully.');
     }
 

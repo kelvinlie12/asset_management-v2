@@ -49,7 +49,6 @@ public function rules(): array
             'team_id' => ['nullable', Rule::exists('teams', 'id')],
 'room_id' => ['nullable', Rule::exists('rooms', 'id'), new RoomBelongsToUnit($this->user(), $owningTeamId)],
             'assigned_user_id' => ['nullable', Rule::exists('users', 'id'), new UserBelongsToUnit($this->user(), $owningTeamId)],
-            'supplier_id' => ['nullable', Rule::exists('suppliers', 'id')],
         ];
     }
 

@@ -27,6 +27,7 @@ class StoreTeamRequest extends FormRequest
             'name' => ['required', 'string', 'max:255', 'unique:teams,name'],
             'description' => ['nullable', 'string'],
             'status' => ['sometimes', Rule::in(Team::STATUSES)],
+            'logo' => ['nullable', 'image', 'mimes:jpeg,png,jpg,webp,gif', 'max:4096'],
             // No room_ids: a unit starts empty and its own users add the rooms
             // it needs, so there is nothing to choose at creation time.
         ];

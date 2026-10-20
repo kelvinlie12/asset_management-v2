@@ -2,9 +2,10 @@
 
 namespace App\Http\Requests;
 
+use App\Models\Room;
 use App\Rules\RoomBelongsToUnit;
 use App\Rules\UserBelongsToUnit;
-use App\Models\Room;
+use App\Support\UnitScope;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
@@ -30,8 +31,8 @@ class StoreAssetAssignmentRequest extends FormRequest
             'asset_id' => ['required', Rule::exists('assets', 'id')],
             'assigned_date' => ['required', 'date'],
             'team_id' => ['nullable', Rule::exists('teams', 'id')],
-            'room_id' => ['nullable', Rule::exists('rooms', 'id'), new RoomBelongsToUnit($this->user())],
-            'assigned_user_id' => ['nullable', Rule::exists('users', 'id'), new UserBelongsToUnit($this->user())],
+            'room_id' => ['nullable', Rule::exists('rooms', 'id'), new RoomBelongsToUnit($this->user(), $this->owningTeamId())],
+            'assigned_user_id' => ['nullable', Rule::exists('users', 'id'), new UserBelongsToUnit($this->user(), $this->owningTeamId())],
             'notes' => ['nullable', 'string'],
         ];
     }
@@ -68,5 +69,20 @@ class StoreAssetAssignmentRequest extends FormRequest
                 }
             },
         ];
+    }
+
+    private function owningTeamId(): int|string|null
+    {
+        $user = $this->user();
+        if ($user && ! UnitScope::bypasses($user) && $user->team_id) {
+            return $user->team_id;
+        }
+
+        $posted = $this->input('team_id');
+        if ($posted !== null && $posted !== '') {
+            return $posted;
+        }
+
+        return null;
     }
 }

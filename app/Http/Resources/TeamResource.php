@@ -19,6 +19,8 @@ class TeamResource extends JsonResource
             'name' => $this->name,
             'slug' => $this->slug,
             'description' => $this->description,
+            'logo' => $this->logo,
+            'logo_url' => $this->logo ? url($this->logo) : null,
             'status' => $this->status,
             'users_count' => $this->whenCounted('users'),
             // Rooms are owned by the unit and managed on the rooms page, so

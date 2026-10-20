@@ -36,8 +36,6 @@ class VehicleResource extends JsonResource
             'description' => $this->description,
             'condition' => $this->condition,
             'usage_status' => $this->usage_status,
-            'supplier_id' => $this->supplier_id,
-            'supplier' => $this->whenLoaded('supplier', fn () => $this->supplier ? new SupplierResource($this->supplier) : null),
             'team' => $this->whenLoaded('team', fn () => $this->team ? new TeamResource($this->team) : null),
             'room' => $this->whenLoaded('room', fn () => $this->room ? new RoomResource($this->room) : null),
             'assigned_user' => $this->whenLoaded('assignedUser', fn () => $this->assignedUser ? new UserResource($this->assignedUser) : null),
