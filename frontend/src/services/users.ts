@@ -161,6 +161,26 @@ export function fetchUserAccess(id: number) {
   return api.get<UserAccess>(`/users/${id}/access`);
 }
 
+/**
+ * Every user of the unit, fetched a page at a time.
+ *
+ * The API caps a page at 100 rows, so an export that must hold the whole unit
+ * walks the pages instead of asking for one big list. `filters` are passed
+ * through untouched, so the exported rows match what the screen filters show.
+ */
+export async function fetchAllUsers(filters: UserFilters = {}) {
+  const first = await fetchUsers({ ...filters, page: 1, per_page: 100 });
+  const rows = [...first.data.data];
+  const lastPage = first.data.meta.last_page;
+
+  for (let page = 2; page <= lastPage; page += 1) {
+    const res = await fetchUsers({ ...filters, page, per_page: 100 });
+    rows.push(...res.data.data);
+  }
+
+  return rows;
+}
+
 export function resetPassword(id: number, password: string) {
   return api.post<{ message: string }>(`/users/${id}/reset-password`, {
     password,

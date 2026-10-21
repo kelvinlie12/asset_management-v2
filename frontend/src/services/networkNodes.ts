@@ -95,6 +95,25 @@ export function fetchNetworkNode(id: number) {
   return api.get<{ node: NetworkNode }>(`/network-nodes/${id}`);
 }
 
+/**
+ * Every network node matching the filters, fetched a page at a time.
+ *
+ * The API caps a page at 100 rows, so an export that must hold the whole list
+ * walks the pages rather than asking for one big list.
+ */
+export async function fetchAllNetworkNodes(filters: NetworkNodeFilters = {}) {
+  const first = await fetchNetworkNodes({ ...filters, page: 1, per_page: 100 });
+  const rows = [...first.data.data];
+  const lastPage = first.data.meta.last_page;
+
+  for (let page = 2; page <= lastPage; page += 1) {
+    const res = await fetchNetworkNodes({ ...filters, page, per_page: 100 });
+    rows.push(...res.data.data);
+  }
+
+  return rows;
+}
+
 export interface NetworkNodePayload {
   asset_id?: number;
   room_id?: string | number;

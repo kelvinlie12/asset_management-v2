@@ -1,5 +1,6 @@
 ﻿import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import PageMeta from "../components/common/PageMeta";
+import ExportButton from "../components/common/ExportButton";
 import Input from "../components/form/input/InputField";
 import Label from "../components/form/Label";
 import Select from "../components/form/Select";
@@ -25,6 +26,7 @@ import {
 } from "../icons";
 import {
   fetchTransfers,
+  fetchAllTransfers,
   fetchTransfer,
   createTransfer,
   updateTransfer,
@@ -261,11 +263,41 @@ export default function Transfers() {
           <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">
             {t("Asset Transfer")}
           </h3>
-          {canCreate && (
-            <Button onClick={addModal.openModal} startIcon={<PlusIcon />}>
-              {t("Transfer Asset")}
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            <ExportButton
+              fileStem={t("Asset Transfer")}
+              headers={() => [
+                t("Asset"),
+                t("Move"),
+                t("Date"),
+                t("Reason"),
+                t("Done By"),
+              ]}
+              rows={async () => {
+                const all = await fetchAllTransfers(filters);
+                return all.map((tr) => [
+                  tr.asset?.name ?? "",
+                  `${placementLabel(
+                    tr.from_team?.name || "",
+                    tr.from_room?.name || "",
+                    tr.from_user?.name || "",
+                  )} -> ${placementLabel(
+                    tr.to_team?.name || "",
+                    tr.to_room?.name || "",
+                    tr.to_user?.name || "",
+                  )}`,
+                  tr.transfer_date ?? "",
+                  tr.reason ?? "",
+                  tr.performed_by?.name ?? "",
+                ]);
+              }}
+            />
+            {canCreate && (
+              <Button onClick={addModal.openModal} startIcon={<PlusIcon />}>
+                {t("Transfer Asset")}
+              </Button>
+            )}
+          </div>
         </div>
 
         <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">

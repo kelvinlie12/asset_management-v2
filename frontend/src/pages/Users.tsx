@@ -1,5 +1,6 @@
 ﻿import { useCallback, useEffect, useState, type FormEvent } from "react";
 import PageMeta from "../components/common/PageMeta";
+import ExportButton from "../components/common/ExportButton";
 import Input from "../components/form/input/InputField";
 import Label from "../components/form/Label";
 import Select from "../components/form/Select";
@@ -28,6 +29,7 @@ import {
 } from "../icons";
 import {
   fetchUsers,
+  fetchAllUsers,
   fetchTeams,
   createUser,
   updateUser,
@@ -340,11 +342,33 @@ export default function Users() {
           <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">
             {t("User Management")}
           </h3>
-          {canCreate && (
-            <Button onClick={addModal.openModal} startIcon={<PlusIcon />}>
-              {t("Add User")}
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            <ExportButton
+              fileStem={t("User Management")}
+              headers={() => [
+                t("Name"),
+                t("Email"),
+                t("Position"),
+                t("Team"),
+                t("Status"),
+              ]}
+              rows={async () => {
+                const all = await fetchAllUsers(filters);
+                return all.map((u) => [
+                  u.name,
+                  u.email,
+                  t(u.role_label),
+                  u.team?.name ?? "",
+                  t(u.status),
+                ]);
+              }}
+            />
+            {canCreate && (
+              <Button onClick={addModal.openModal} startIcon={<PlusIcon />}>
+                {t("Add User")}
+              </Button>
+            )}
+          </div>
         </div>
 
         <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">

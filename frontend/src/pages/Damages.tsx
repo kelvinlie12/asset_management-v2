@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { useLocation, useNavigate } from "react-router";
 import PageMeta from "../components/common/PageMeta";
+import ExportButton from "../components/common/ExportButton";
 import Input from "../components/form/input/InputField";
 import Label from "../components/form/Label";
 import Select from "../components/form/Select";
@@ -20,6 +21,7 @@ import { useLang } from "../context/LanguageContext";
 import { PlusIcon, EyeIcon, AlertIcon, PencilIcon, TrashBinIcon } from "../icons";
 import {
   fetchDamages,
+  fetchAllDamages,
   fetchDamage,
   createDamage,
   updateDamage,
@@ -270,11 +272,37 @@ export default function Damages() {
           <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">
             {t("Asset Damage Report")}
           </h3>
-          {canCreate && (
-            <Button onClick={addModal.openModal} startIcon={<PlusIcon />}>
-              {t("Report Damage")}
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            <ExportButton
+              fileStem={t("Asset Damage Report")}
+              headers={() => [
+                t("Asset"),
+                t("Damage Date"),
+                t("User / Responsible"),
+                t("Description"),
+                t("Done By"),
+              ]}
+              rows={async () => {
+                const all = await fetchAllDamages(filters);
+                return all.map((d) => [
+                  d.asset?.name ?? "",
+                  d.damage_date ?? "",
+                  d.responsible?.name
+                    ? `${d.user?.name ?? "-"} (${t("resp. {name}", {
+                        name: d.responsible.name,
+                      })})`
+                    : (d.user?.name ?? ""),
+                  d.description,
+                  d.performed_by?.name ?? "",
+                ]);
+              }}
+            />
+            {canCreate && (
+              <Button onClick={addModal.openModal} startIcon={<PlusIcon />}>
+                {t("Report Damage")}
+              </Button>
+            )}
+          </div>
         </div>
 
         <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">

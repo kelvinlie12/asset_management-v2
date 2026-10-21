@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import PageMeta from "../components/common/PageMeta";
+import ExportButton from "../components/common/ExportButton";
 import Input from "../components/form/input/InputField";
 import Label from "../components/form/Label";
 import Select from "../components/form/Select";
@@ -30,6 +31,7 @@ import {
 } from "../icons";
 import {
   fetchVehicles,
+  fetchAllVehicles,
   fetchVehicle,
   createVehicle,
   updateVehicle,
@@ -365,11 +367,48 @@ if (payload.editing) {
           <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">
             {t("Vehicle Assets")}
           </h3>
-          {canCreate && (
-            <Button onClick={openAddModal} startIcon={<PlusIcon />}>
-              {t("Add Vehicle")}
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            <ExportButton
+              fileStem={t("Vehicle Assets")}
+              headers={() => [
+                t("Vehicle"),
+                t("Plate Number"),
+                t("Team"),
+                t("Condition"),
+                t("Date Entered"),
+                t("Tax Due"),
+                t("Tax Status"),
+              ]}
+              rows={async () => {
+                const all = await fetchAllVehicles(filters);
+                return all.map((v) => [
+                  `${v.brand} ${v.model}`.trim(),
+                  v.plate_number ?? "",
+                  v.team?.name ?? "",
+                  translateLabel(
+                    t,
+                    VEHICLE_CONDITION_OPTIONS.find(
+                      (o) => o.value === v.condition,
+                    )?.label ?? v.condition,
+                  ),
+                  v.placement_date ?? "",
+                  v.tax_due_date ?? "",
+                  v.tax_health
+                    ? translateLabel(
+                        t,
+                        VEHICLE_TAX_HEALTH_META[v.tax_health.key]?.label ??
+                          v.tax_health.label,
+                      )
+                    : "",
+                ]);
+              }}
+            />
+            {canCreate && (
+              <Button onClick={openAddModal} startIcon={<PlusIcon />}>
+                {t("Add Vehicle")}
+              </Button>
+            )}
+          </div>
         </div>
 
 

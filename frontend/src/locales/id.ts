@@ -294,6 +294,7 @@ export const id: Record<string, string> = {
   "Purchase Details": "Detail Pembelian",
   "Purchase History": "Riwayat Pembelian",
   "Purchase history by month and supplier.": "Riwayat pembelian berdasarkan bulan dan supplier.",
+  "Purchase history by month.": "Riwayat pembelian berdasarkan bulan.",
   "Create Record": "Buat Catatan",
   "Record Purchase": "Catat Pembelian",
   "Record a new asset purchase. A new asset entry with a generated code and IN_STORAGE status will be created automatically.": "Catat pembelian aset baru. Entri aset baru dengan kode yang dihasilkan dan status IN_STORAGE akan dibuat secara otomatis.",
@@ -1066,4 +1067,9 @@ export const id: Record<string, string> = {
   "changed priority from {from} to {to}": "mengubah prioritas dari {from} ke {to}",
   "assigned the task to {name}": "menugaskan task ke {name}",
   "unassigned the task": "menghapus penugasan task",
+
+  // Ekspor Excel
+  "Export Excel": "Export Excel",
+  "Menyiapkan…": "Menyiapkan…",
+  "Failed to export data.": "Gagal mengekspor data.",
 };

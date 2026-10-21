@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import PageMeta from "../components/common/PageMeta";
+import ExportButton from "../components/common/ExportButton";
 import Input from "../components/form/input/InputField";
 import Label from "../components/form/Label";
 import FileInput from "../components/form/input/FileInput";
@@ -20,6 +21,7 @@ import { useLang } from "../context/LanguageContext";
 import { PlusIcon, PencilIcon, TrashBinIcon, EyeIcon, GroupIcon } from "../icons";
 import {
   fetchTeams,
+  fetchAllTeams,
   createTeam,
   updateTeam,
   deleteTeam,
@@ -191,11 +193,33 @@ export default function Teams() {
           <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">
             {t("Team Management")}
           </h3>
-          {canCreate && (
-            <Button onClick={addModal.openModal} startIcon={<PlusIcon />}>
-              {t("Add Team")}
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            <ExportButton
+              fileStem={t("Team Management")}
+              headers={() => [
+                t("Team"),
+                t("Description"),
+                t("Members"),
+                t("Rooms"),
+                t("Status"),
+              ]}
+              rows={async () => {
+                const all = await fetchAllTeams(filters);
+                return all.map((team) => [
+                  team.name,
+                  team.description ?? "",
+                  team.users_count ?? 0,
+                  team.rooms_count ?? 0,
+                  t(team.status),
+                ]);
+              }}
+            />
+            {canCreate && (
+              <Button onClick={addModal.openModal} startIcon={<PlusIcon />}>
+                {t("Add Team")}
+              </Button>
+            )}
+          </div>
         </div>
 
         <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">

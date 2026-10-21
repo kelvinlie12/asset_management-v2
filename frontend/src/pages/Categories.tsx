@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import PageMeta from "../components/common/PageMeta";
+import ExportButton from "../components/common/ExportButton";
 import Input from "../components/form/input/InputField";
 import Label from "../components/form/Label";
 import Select from "../components/form/Select";
@@ -19,6 +20,7 @@ import { useLang } from "../context/LanguageContext";
 import { PlusIcon, PencilIcon, TrashBinIcon, EyeIcon, FolderIcon } from "../icons";
 import {
   fetchCategories,
+  fetchAllCategories,
   fetchCategory,
   createCategory,
   updateCategory,
@@ -208,11 +210,33 @@ export default function Categories() {
           <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">
             {t("Category Management")}
           </h3>
-          {canCreate && (
-            <Button onClick={addModal.openModal} startIcon={<PlusIcon />}>
-              {t("Add Category")}
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            <ExportButton
+              fileStem={t("Category Management")}
+              headers={() => [
+                t("Category"),
+                t("Code"),
+                t("Team"),
+                t("Assets"),
+                t("Status"),
+              ]}
+              rows={async () => {
+                const all = await fetchAllCategories(filters);
+                return all.map((c) => [
+                  c.name,
+                  c.code,
+                  c.team?.name ?? t("Global"),
+                  c.assets_count ?? 0,
+                  t(c.status),
+                ]);
+              }}
+            />
+            {canCreate && (
+              <Button onClick={addModal.openModal} startIcon={<PlusIcon />}>
+                {t("Add Category")}
+              </Button>
+            )}
+          </div>
         </div>
 
         <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">

@@ -52,6 +52,25 @@ export function fetchTeam(id: number) {
   return api.get<{ team: Team }>(`/teams/${id}`);
 }
 
+/**
+ * Every unit matching the filters, fetched a page at a time.
+ *
+ * The API caps a page at 100 rows, so an export that must hold the whole list
+ * walks the pages rather than asking for one big list.
+ */
+export async function fetchAllTeams(filters: TeamFilters = {}) {
+  const first = await fetchTeams({ ...filters, page: 1, per_page: 100 });
+  const rows = [...first.data.data];
+  const lastPage = first.data.meta.last_page;
+
+  for (let page = 2; page <= lastPage; page += 1) {
+    const res = await fetchTeams({ ...filters, page, per_page: 100 });
+    rows.push(...res.data.data);
+  }
+
+  return rows;
+}
+
 // In development VITE_API_URL is empty and the API is reached through the Vite
 // proxy, so a relative path works. In production the backend lives on its own
 // origin, so the absolute URL is the safe choice.

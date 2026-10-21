@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { useLocation, useNavigate } from "react-router";
 import PageMeta from "../components/common/PageMeta";
+import ExportButton from "../components/common/ExportButton";
 import Input from "../components/form/input/InputField";
 import Label from "../components/form/Label";
 import Select from "../components/form/Select";
@@ -20,6 +21,7 @@ import { useLang } from "../context/LanguageContext";
 import { PlusIcon, TrashBinIcon, EyeIcon, DollarLineIcon } from "../icons";
 import {
   fetchPurchases,
+  fetchAllPurchases,
   fetchPurchase,
   createPurchase,
   deletePurchase,
@@ -223,11 +225,33 @@ export default function Purchases() {
           <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">
             {t("Purchase Management")}
           </h3>
-          {canCreate && (
-            <Button onClick={addModal.openModal} startIcon={<PlusIcon />}>
-              {t("Record Purchase")}
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            <ExportButton
+              fileStem={t("Purchase Management")}
+              headers={() => [
+                t("Purchase"),
+                t("Invoice Number"),
+                t("Asset"),
+                t("Date"),
+                t("Amount"),
+              ]}
+              rows={async () => {
+                const all = await fetchAllPurchases(filters);
+                return all.map((p) => [
+                  p.purchase_number,
+                  p.invoice_number,
+                  p.asset?.name ?? "",
+                  p.purchase_date ?? "",
+                  Number(p.amount).toLocaleString("id-ID"),
+                ]);
+              }}
+            />
+            {canCreate && (
+              <Button onClick={addModal.openModal} startIcon={<PlusIcon />}>
+                {t("Record Purchase")}
+              </Button>
+            )}
+          </div>
         </div>
 
         <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
@@ -249,9 +273,6 @@ export default function Purchases() {
                     {t("Purchase")}
                   </TableCell>
                   <TableCell isHeader className="px-5 py-3 text-sm text-gray-500 dark:text-gray-400">
-                    {t("Supplier")}
-                  </TableCell>
-                  <TableCell isHeader className="px-5 py-3 text-sm text-gray-500 dark:text-gray-400">
                     {t("Asset")}
                   </TableCell>
                   <TableCell isHeader className="px-5 py-3 text-sm text-gray-500 dark:text-gray-400">
@@ -271,14 +292,14 @@ export default function Purchases() {
               <TableBody>
                 {loading && (
                   <TableRow>
-                    <TableCell colSpan={7} className="px-5 py-6 text-center text-sm text-gray-500">
+                    <TableCell colSpan={6} className="px-5 py-6 text-center text-sm text-gray-500">
                       {t("Loading...")}
                     </TableCell>
                   </TableRow>
                 )}
                 {!loading && purchases.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={7} className="px-5 py-6 text-center text-sm text-gray-500">
+                    <TableCell colSpan={6} className="px-5 py-6 text-center text-sm text-gray-500">
                       {t("No purchases found.")}
                     </TableCell>
                   </TableRow>
@@ -300,9 +321,6 @@ export default function Purchases() {
                             </p>
                           </div>
                         </div>
-                      </TableCell>
-                      <TableCell className="px-5 py-4 text-sm text-gray-600 dark:text-gray-400">
-                        {p.supplier}
                       </TableCell>
                       <TableCell className="px-5 py-4">
                         <div>

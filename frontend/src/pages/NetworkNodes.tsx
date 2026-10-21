@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import PageMeta from "../components/common/PageMeta";
+import ExportButton from "../components/common/ExportButton";
 import Input from "../components/form/input/InputField";
 import Label from "../components/form/Label";
 import Select from "../components/form/Select";
@@ -26,6 +27,7 @@ import {
 } from "../icons";
 import {
   fetchNetworkNodes,
+  fetchAllNetworkNodes,
   fetchNetworkNode,
   createNetworkNode,
   updateNetworkNode,
@@ -245,17 +247,43 @@ export default function NetworkNodes() {
           <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">
             {t("Network Nodes")}
           </h3>
-          {canCreate && (
-            <Button
-              onClick={() => {
-                setSelected(null);
-                addModal.openModal();
+          <div className="flex items-center gap-2">
+            <ExportButton
+              fileStem={t("Network Nodes")}
+              headers={() => [
+                t("Node"),
+                t("Type"),
+                t("Site"),
+                t("PON Port"),
+                t("Ports Used"),
+                t("Status"),
+              ]}
+              rows={async () => {
+                const all = await fetchAllNetworkNodes(filters);
+                return all.map((n) => [
+                  n.label || n.asset?.name || "",
+                  n.node_type,
+                  n.room?.name ?? "",
+                  n.pon_port ?? "",
+                  n.port_capacity
+                    ? `${n.port_used ?? 0} / ${n.port_capacity}`
+                    : (n.port_used ?? 0),
+                  t(n.status),
+                ]);
               }}
-              startIcon={<PlusIcon />}
-            >
-              {t("Add Node")}
-            </Button>
-          )}
+            />
+            {canCreate && (
+              <Button
+                onClick={() => {
+                  setSelected(null);
+                  addModal.openModal();
+                }}
+                startIcon={<PlusIcon />}
+              >
+                {t("Add Node")}
+              </Button>
+            )}
+          </div>
         </div>
 
         <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">

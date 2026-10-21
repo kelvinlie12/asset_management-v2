@@ -149,6 +149,25 @@ export function fetchVehicleCode() {
   return api.get<{ asset_code: string }>("/vehicles/generate-code");
 }
 
+/**
+ * Every vehicle matching the filters, fetched a page at a time.
+ *
+ * The API caps a page at 100 rows, so an export that must hold the whole fleet
+ * walks the pages rather than asking for one big list.
+ */
+export async function fetchAllVehicles(filters: VehicleFilters = {}) {
+  const first = await fetchVehicles({ ...filters, page: 1, per_page: 100 });
+  const rows = [...first.data.data];
+  const lastPage = first.data.meta.last_page;
+
+  for (let page = 2; page <= lastPage; page += 1) {
+    const res = await fetchVehicles({ ...filters, page, per_page: 100 });
+    rows.push(...res.data.data);
+  }
+
+  return rows;
+}
+
 export function createVehicle(payload: FormData | Record<string, unknown>) {
   return api.post<{ message: string; vehicle: Vehicle }>("/vehicles", payload);
 }

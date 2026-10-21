@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router";
 import PageMeta from "../components/common/PageMeta";
+import ExportButton from "../components/common/ExportButton";
 import Input from "../components/form/input/InputField";
 import TextArea from "../components/form/input/TextArea";
 import Label from "../components/form/Label";
@@ -21,6 +22,7 @@ import { useLang } from "../context/LanguageContext";
 import { PlusIcon, EyeIcon, PencilIcon, TrashBinIcon } from "../icons";
 import {
   fetchAssets,
+  fetchAllAssets,
   fetchAssetCode,
   createAsset,
   updateAsset,
@@ -114,6 +116,7 @@ export default function Assets() {
   const formModal = useModal();
   const detailModal = useModal();
   const deleteModal = useModal();
+  const wordModal = useModal();
 
   const loadAssets = useCallback(async () => {
     setLoading(true);
@@ -272,17 +275,46 @@ export default function Assets() {
           <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">
             {t("Asset Data")}
           </h3>
-          {canCreate && (
-            <Button
-              onClick={() => {
-                setEditing(null);
-                formModal.openModal();
+          <div className="flex items-center gap-2">
+            <ExportButton
+              fileStem={t("Asset Data")}
+              headers={() => [
+                t("Asset"),
+                t("Code"),
+                t("Category"),
+                t("Condition"),
+                t("Usage Status"),
+                t("Location"),
+                t("Team"),
+              ]}
+              rows={async () => {
+                const all = await fetchAllAssets(filters);
+                return all.map((a) => [
+                  a.name,
+                  a.asset_code,
+                  a.category?.name ?? "",
+                  conditionLabel(a.condition),
+                  t(
+                    USAGE_STATUS_OPTIONS.find((o) => o.value === a.usage_status)
+                      ?.label ?? a.usage_status,
+                  ),
+                  a.room?.name ?? "",
+                  a.team?.name ?? "",
+                ]);
               }}
-              startIcon={<PlusIcon />}
-            >
-              {t("Add Asset")}
-            </Button>
-          )}
+            />
+            {canCreate && (
+              <Button
+                onClick={() => {
+                  setEditing(null);
+                  formModal.openModal();
+                }}
+                startIcon={<PlusIcon />}
+              >
+                {t("Add Asset")}
+              </Button>
+            )}
+          </div>
         </div>
 
         <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">

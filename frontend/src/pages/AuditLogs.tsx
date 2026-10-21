@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import PageMeta from "../components/common/PageMeta";
+import ExportButton from "../components/common/ExportButton";
 import Input from "../components/form/input/InputField";
 import Select from "../components/form/Select";
 import Badge from "../components/ui/badge/Badge";
@@ -21,6 +22,7 @@ import { extractApiError as extractError } from "../utils/error";
 import { EyeIcon, TaskIcon } from "../icons";
 import {
   fetchAuditLogs,
+  fetchAllAuditLogs,
   EVENT_OPTIONS,
   type AuditLog,
   type Paginated,
@@ -179,9 +181,33 @@ export default function AuditLogs() {
           <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">
             {t("Audit Log")}
           </h3>
-          <Button size="sm" variant="outline" onClick={resetFilters}>
-            {t("Reset Filters")}
-          </Button>
+          <div className="flex items-center gap-2">
+            <ExportButton
+              fileStem={t("Audit Log")}
+              headers={() => [
+                t("User"),
+                t("Event"),
+                t("Module"),
+                t("Record ID"),
+                t("IP Address"),
+                t("Time"),
+              ]}
+              rows={async () => {
+                const all = await fetchAllAuditLogs(filters);
+                return all.map((log) => [
+                  log.user?.name ?? t("System"),
+                  t(log.event_label),
+                  log.auditable_label ?? log.auditable_type,
+                  log.auditable_id,
+                  log.ip_address ?? "",
+                  formatDateTime(log.created_at),
+                ]);
+              }}
+            />
+            <Button size="sm" variant="outline" onClick={resetFilters}>
+              {t("Reset Filters")}
+            </Button>
+          </div>
         </div>
 
         <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">

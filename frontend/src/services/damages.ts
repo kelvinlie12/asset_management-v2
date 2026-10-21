@@ -54,6 +54,25 @@ export function fetchDamage(id: number) {
   return api.get<{ damage: AssetDamage }>(`/damages/${id}`);
 }
 
+/**
+ * Every damage report matching the filters, fetched a page at a time.
+ *
+ * The API caps a page at 100 rows, so an export that must hold the whole list
+ * walks the pages rather than asking for one big list.
+ */
+export async function fetchAllDamages(filters: DamageFilters = {}) {
+  const first = await fetchDamages({ ...filters, page: 1, per_page: 100 });
+  const rows = [...first.data.data];
+  const lastPage = first.data.meta.last_page;
+
+  for (let page = 2; page <= lastPage; page += 1) {
+    const res = await fetchDamages({ ...filters, page, per_page: 100 });
+    rows.push(...res.data.data);
+  }
+
+  return rows;
+}
+
 export function createDamage(
   payload: Record<string, unknown> & { photo?: File | null },
 ) {

@@ -53,6 +53,25 @@ export function fetchRoom(id: number) {
   return api.get<{ room: Room }>(`/rooms/${id}`);
 }
 
+/**
+ * Every room matching the filters, fetched a page at a time.
+ *
+ * The API caps a page at 100 rows, so an export that must hold the whole list
+ * walks the pages rather than asking for one big list.
+ */
+export async function fetchAllRooms(filters: RoomFilters = {}) {
+  const first = await fetchRooms({ ...filters, page: 1, per_page: 100 });
+  const rows = [...first.data.data];
+  const lastPage = first.data.meta.last_page;
+
+  for (let page = 2; page <= lastPage; page += 1) {
+    const res = await fetchRooms({ ...filters, page, per_page: 100 });
+    rows.push(...res.data.data);
+  }
+
+  return rows;
+}
+
 export function createRoom(payload: Record<string, unknown>) {
   return api.post<{ message: string; room: Room }>("/rooms", payload);
 }

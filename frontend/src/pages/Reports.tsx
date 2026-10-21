@@ -6,7 +6,7 @@ import { useLang } from "../context/LanguageContext";
 
 const reportLinks = [
   { label: "Assets Report", desc: "All assets with current status and condition.", path: "/assets", perm: "assets.view" },
-  { label: "Purchases Report", desc: "Purchase history by month and supplier.", path: "/purchases", perm: "purchases.view" },
+  { label: "Purchases Report", desc: "Purchase history by month.", path: "/purchases", perm: "purchases.view" },
   { label: "Transfers Report", desc: "Asset transfer history between rooms/teams.", path: "/transfers", perm: "transfers.view" },
   { label: "Damages Report", desc: "List of damaged assets.", path: "/damages", perm: "damages.view" },
   { label: "Vehicles Report", desc: "Vehicle fleet and tax due dates.", path: "/vehicles", perm: "vehicles.view" },

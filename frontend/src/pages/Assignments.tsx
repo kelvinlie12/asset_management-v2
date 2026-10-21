@@ -1,5 +1,6 @@
 ﻿import { useCallback, useEffect, useState, type FormEvent } from "react";
 import PageMeta from "../components/common/PageMeta";
+import ExportButton from "../components/common/ExportButton";
 import Input from "../components/form/input/InputField";
 import Label from "../components/form/Label";
 import Select from "../components/form/Select";
@@ -19,6 +20,7 @@ import { useLang } from "../context/LanguageContext";
 import { PlusIcon, EyeIcon, TaskIcon } from "../icons";
 import {
   fetchAssignments,
+  fetchAllAssignments,
   fetchAssignment,
   createAssignment,
   type AssetAssignment,
@@ -192,11 +194,35 @@ export default function Assignments() {
           <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">
             {t("Asset Assignment")}
           </h3>
-          {canManage && (
-            <Button onClick={addModal.openModal} startIcon={<PlusIcon />}>
-              {t("Assign Asset")}
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            <ExportButton
+              fileStem={t("Asset Assignment")}
+              headers={() => [
+                t("Asset"),
+                t("Assigned To"),
+                t("Team"),
+                t("Room"),
+                t("Date"),
+                t("Notes"),
+              ]}
+              rows={async () => {
+                const all = await fetchAllAssignments(filters);
+                return all.map((a) => [
+                  a.asset?.name ?? "",
+                  a.assigned_user?.name ?? "",
+                  a.team?.name ?? "",
+                  a.room?.name ?? "",
+                  a.assigned_date ?? "",
+                  a.notes ?? "",
+                ]);
+              }}
+            />
+            {canManage && (
+              <Button onClick={addModal.openModal} startIcon={<PlusIcon />}>
+                {t("Assign Asset")}
+              </Button>
+            )}
+          </div>
         </div>
 
         <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">

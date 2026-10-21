@@ -4,20 +4,21 @@ import { useEffect, useState } from "react";
 import { GroupIcon, CheckLineIcon, ChevronDownIcon } from "../../icons";
 import { Dropdown } from "../ui/dropdown/Dropdown";
 import { useTeam } from "../../context/TeamContext";
-import { useAuth, hasPermission } from "../../context/AuthContext";
+import { useAuth } from "../../context/AuthContext";
 import { useLang } from "../../context/LanguageContext";
 import { fetchTeams, type Team } from "../../services/teams";
 
 export default function TeamSelector() {
   const { user } = useAuth();
   const { t } = useLang();
-  const canViewTeams = hasPermission(user, "teams.view");
+  // Only a super admin switches between units, and that list needs teams.view.
+  const isSuperAdmin = user?.role === "super_admin";
   const { activeTeamId, setActiveTeamId } = useTeam();
   const [isOpen, setIsOpen] = useState(false);
   const [teams, setTeams] = useState<Team[]>([]);
 
   useEffect(() => {
-    if (!canViewTeams) return;
+    if (!isSuperAdmin) return;
     let cancelled = false;
     (async () => {
       try {
@@ -30,15 +31,21 @@ export default function TeamSelector() {
     return () => {
       cancelled = true;
     };
-  }, [canViewTeams]);
-  const isSuperAdmin = user?.role === "super_admin";
+  }, [isSuperAdmin]);
   const activeTeam =
     teams.find((team) => String(team.id) === activeTeamId) ?? null;
 
+  /**
+   * A unit user is pinned to their own team, so the header shows a plain label:
+   * there is nothing to switch to.
+   *
+   * Deliberately not gated on `teams.view` — before this it called the team API
+   * whenever the permission was held, which 403s for anyone granted
+   * `permissions.view` instead (see the Settings module). The user's own team
+   * name already travels with their profile.
+   */
   if (!isSuperAdmin) {
-    const teamName =
-      user?.team?.name ??
-      teams.find((team) => String(team.id) === String(user?.team_id))?.name;
+    const teamName = user?.team?.name;
     if (teamName) {
       return (
         <div className="relative">

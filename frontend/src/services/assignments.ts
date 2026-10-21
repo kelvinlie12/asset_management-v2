@@ -46,6 +46,25 @@ export function fetchAssignment(id: number) {
   return api.get<{ assignment: AssetAssignment }>(`/assignments/${id}`);
 }
 
+/**
+ * Every placement record matching the filters, fetched a page at a time.
+ *
+ * The API caps a page at 100 rows, so an export that must hold the whole list
+ * walks the pages rather than asking for one big list.
+ */
+export async function fetchAllAssignments(filters: AssignmentFilters = {}) {
+  const first = await fetchAssignments({ ...filters, page: 1, per_page: 100 });
+  const rows = [...first.data.data];
+  const lastPage = first.data.meta.last_page;
+
+  for (let page = 2; page <= lastPage; page += 1) {
+    const res = await fetchAssignments({ ...filters, page, per_page: 100 });
+    rows.push(...res.data.data);
+  }
+
+  return rows;
+}
+
 export function createAssignment(payload: Record<string, unknown>) {
   return api.post<{ message: string; assignment: AssetAssignment }>(
     "/assignments",

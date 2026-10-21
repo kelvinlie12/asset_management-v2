@@ -53,6 +53,25 @@ export function fetchTransfer(id: number) {
   return api.get<{ transfer: AssetTransfer }>(`/transfers/${id}`);
 }
 
+/**
+ * Every transfer matching the filters, fetched a page at a time.
+ *
+ * The API caps a page at 100 rows, so an export that must hold the whole list
+ * walks the pages rather than asking for one big list.
+ */
+export async function fetchAllTransfers(filters: TransferFilters = {}) {
+  const first = await fetchTransfers({ ...filters, page: 1, per_page: 100 });
+  const rows = [...first.data.data];
+  const lastPage = first.data.meta.last_page;
+
+  for (let page = 2; page <= lastPage; page += 1) {
+    const res = await fetchTransfers({ ...filters, page, per_page: 100 });
+    rows.push(...res.data.data);
+  }
+
+  return rows;
+}
+
 // The proof photo travels as a file, so transfers are sent as multipart form
 // data. A null value is sent as an empty string so a cleared target (team,
 // room or user) is still cleared on the server.
