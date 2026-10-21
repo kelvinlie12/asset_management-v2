@@ -21,6 +21,7 @@ use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\VehicleController;
 use App\Http\Controllers\Api\VehicleTaxController;
 use App\Http\Controllers\Api\VehicleTaxReminderController;
+use App\Http\Controllers\Api\WorkTeamController;
 use App\Support\ApiResponse;
 use Illuminate\Support\Facades\Route;
 
@@ -72,6 +73,13 @@ Route::prefix('v1')->group(function () {
         Route::get('/teams/{team}', [TeamController::class, 'show'])->middleware('permission:teams.view');
         Route::put('/teams/{team}', [TeamController::class, 'update'])->middleware('permission:teams.update');
 Route::delete('/teams/{team}', [TeamController::class, 'destroy'])->middleware('permission:teams.delete');
+
+        // Work Team (Tim kerja) management: a working group inside a unit.
+        Route::get('/work-teams', [WorkTeamController::class, 'index'])->middleware('permission:work_teams.view');
+        Route::post('/work-teams', [WorkTeamController::class, 'store'])->middleware('permission:work_teams.create');
+        Route::get('/work-teams/{workTeam}', [WorkTeamController::class, 'show'])->middleware('permission:work_teams.view');
+        Route::put('/work-teams/{workTeam}', [WorkTeamController::class, 'update'])->middleware('permission:work_teams.update');
+        Route::delete('/work-teams/{workTeam}', [WorkTeamController::class, 'destroy'])->middleware('permission:work_teams.delete');
 
         // Room (Ruangan) management
         Route::get('/rooms', [RoomController::class, 'index'])->middleware('permission:rooms.view');

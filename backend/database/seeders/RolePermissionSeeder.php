@@ -46,6 +46,11 @@ class RolePermissionSeeder extends Seeder
         'teams.create',
         'teams.update',
         'teams.delete',
+        // Work Team (Tim kerja) management
+        'work_teams.view',
+        'work_teams.create',
+        'work_teams.update',
+        'work_teams.delete',
         // Room (Ruangan) management
         'rooms.view',
         'rooms.create',
@@ -121,6 +126,10 @@ class RolePermissionSeeder extends Seeder
             'profile.update',
             'profile.password',
             'teams.view',
+            'work_teams.view',
+            'work_teams.create',
+            'work_teams.update',
+            'work_teams.delete',
             'rooms.view',
             'categories.view',
             'assets.view',
@@ -146,6 +155,10 @@ class RolePermissionSeeder extends Seeder
             'teams.create',
             'teams.update',
             'teams.delete',
+            'work_teams.view',
+            'work_teams.create',
+            'work_teams.update',
+            'work_teams.delete',
             'rooms.view',
             'rooms.create',
             'rooms.update',
@@ -221,6 +234,18 @@ class RolePermissionSeeder extends Seeder
                     $user->syncModules(ModuleCatalog::DEFAULT_OWNER_MODULES);
                 }
             });
+
+        // Existing unit admins should be able to manage work teams too. Query
+        // the permission rows directly so a stale registrar cache never hides
+        // the freshly created permissions.
+        $workTeamPermissions = Permission::query()
+            ->whereIn('name', ['work_teams.view', 'work_teams.create', 'work_teams.update', 'work_teams.delete'])
+            ->get();
+
+        User::query()
+            ->where('role', User::ROLE_ADMIN)
+            ->get()
+            ->each(fn (User $user) => $user->givePermissionTo($workTeamPermissions));
 
         // Drop the cached snapshot so subsequent lookups see the current rows.
         app(PermissionRegistrar::class)->forgetCachedPermissions();

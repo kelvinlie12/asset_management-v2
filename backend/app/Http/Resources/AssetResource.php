@@ -30,6 +30,7 @@ class AssetResource extends JsonResource
             'condition' => $this->condition,
             'usage_status' => $this->usage_status,
             'team' => $this->whenLoaded('team', fn () => $this->team ? new TeamResource($this->team) : null),
+            'work_team' => $this->whenLoaded('workTeam', fn () => $this->workTeam ? new WorkTeamResource($this->workTeam) : null),
             'room' => $this->whenLoaded('room', fn () => $this->room ? new RoomResource($this->room) : null),
             'assigned_user' => $this->whenLoaded('assignedUser', fn () => $this->assignedUser ? new UserResource($this->assignedUser) : null),
             'purchases' => PurchaseResource::collection($this->whenLoaded('purchases')),
