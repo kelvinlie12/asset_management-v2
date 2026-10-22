@@ -89,14 +89,14 @@ class OwnerModuleAccessTest extends TestCase
         $keuangan = $this->ownerOf($teamB);
 
         $teknik->syncModules(['assets', 'damages', 'network']);
-        $keuangan->syncModules(['assets', 'damages', 'purchases', 'suppliers']);
+        $keuangan->syncModules(['assets', 'damages', 'purchases']);
 
         $this->assertSame(
             ['assets', 'damages', 'network'],
             $teknik->fresh()->getModuleKeys()
         );
         $this->assertSame(
-            ['assets', 'damages', 'purchases', 'suppliers'],
+            ['assets', 'damages', 'purchases'],
             $keuangan->fresh()->getModuleKeys()
         );
     }
@@ -128,7 +128,7 @@ class OwnerModuleAccessTest extends TestCase
         $keuangan = $this->ownerOf($teamB);
 
         $teknik->syncModules(['assets', 'damages', 'network']);
-        $keuangan->syncModules(['assets', 'damages', 'purchases', 'suppliers']);
+        $keuangan->syncModules(['assets', 'damages', 'purchases']);
 
         Sanctum::actingAs($teknik->fresh());
 
@@ -137,12 +137,10 @@ class OwnerModuleAccessTest extends TestCase
         $this->getJson('/api/v1/lookups')->assertOk();
         $this->getJson('/api/v1/network-nodes')->assertOk();
         $this->getJson('/api/v1/purchases')->assertForbidden();
-        $this->getJson('/api/v1/suppliers')->assertForbidden();
 
         Sanctum::actingAs($keuangan->fresh());
 
         $this->getJson('/api/v1/purchases')->assertOk();
-        $this->getJson('/api/v1/suppliers')->assertOk();
         $this->getJson('/api/v1/network-nodes')->assertForbidden();
     }
 
@@ -243,7 +241,7 @@ class OwnerModuleAccessTest extends TestCase
             ->assertJsonPath('data.user.modules', ['assets', 'vehicles']);
 
         $this->assertTrue($owner->fresh()->can('vehicles.view'));
-        $this->assertFalse($owner->fresh()->can('suppliers.view'));
+        $this->assertFalse($owner->fresh()->can('network.view'));
     }
 
     public function test_owner_cannot_change_module_access(): void

@@ -6,11 +6,9 @@ use App\Rules\CategoryBelongsToUnit;
 use App\Rules\RoomBelongsToUnit;
 use App\Rules\UserBelongsToUnit;
 use App\Models\Asset;
-use App\Models\Room;
 use App\Support\UnitScope;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
-use Illuminate\Validation\Validator;
 
 class StoreAssetRequest extends FormRequest
 {
@@ -44,6 +42,7 @@ class StoreAssetRequest extends FormRequest
             'condition' => ['required', Rule::in(Asset::CONDITIONS)],
             'usage_status' => ['required', Rule::in(Asset::USAGE_STATUSES)],
             'team_id' => ['nullable', Rule::exists('teams', 'id')],
+            'work_team_id' => ['nullable', Rule::exists('work_teams', 'id')],
             'room_id' => ['nullable', Rule::exists('rooms', 'id'), new RoomBelongsToUnit($this->user(), $owningTeamId)],
             'assigned_user_id' => ['nullable', Rule::exists('users', 'id'), new UserBelongsToUnit($this->user(), $owningTeamId)],
         ];
@@ -67,35 +66,5 @@ class StoreAssetRequest extends FormRequest
         $posted = $this->input('team_id');
 
         return ($posted === null || $posted === '') ? null : $posted;
-    }
-
-    /**
-     * Enforce the business rule: a damaged asset must be stored in a warehouse.
-     */
-    public function withValidator(Validator $validator): void
-    {
-        $validator->after(function (Validator $validator) {
-            $data = $validator->getData();
-            $condition = $data['condition'] ?? null;
-
-            if ($condition !== Asset::CONDITION_DAMAGED) {
-                return;
-            }
-
-            if (($data['usage_status'] ?? null) !== Asset::USAGE_IN_STORAGE) {
-                $validator->errors()->add(
-                    'usage_status',
-                    'A damaged asset must be stored in the warehouse (usage status IN_STORAGE).',
-                );
-            }
-
-            $roomId = $data['room_id'] ?? null;
-            if ($roomId && ! Room::query()->where('id', $roomId)->where('is_storage', true)->exists()) {
-                $validator->errors()->add(
-                    'room_id',
-                    'A damaged asset must be assigned to a storage room (warehouse).',
-                );
-            }
-        });
     }
 }

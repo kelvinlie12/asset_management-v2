@@ -157,6 +157,16 @@ class AccessCatalog
                     ],
                 ],
                 [
+                    'key' => 'work_teams',
+                    'label' => 'Team (Tim Kerja)',
+                    'actions' => [
+                        'view' => 'work_teams.view',
+                        'create' => 'work_teams.create',
+                        'update' => 'work_teams.update',
+                        'delete' => 'work_teams.delete',
+                    ],
+                ],
+                [
                     'key' => 'rooms',
                     'label' => 'Ruang',
                     'actions' => [
@@ -165,8 +175,7 @@ class AccessCatalog
                         'update' => 'rooms.update',
                         'delete' => 'rooms.delete',
                     ],
-                ],
-                [
+                ],                [
                     'key' => 'users',
                     'label' => 'Pengguna Unit',
                     'actions' => [

@@ -24,6 +24,7 @@ class DatabaseSeeder extends Seeder
         // they run before RoomSeeder, which fills in every unit's rooms.
         $this->call(OwnerSeeder::class);
         $this->call(RoomSeeder::class);
+        $this->call(WorkTeamSeeder::class);
         $this->call(AssetSeeder::class);
         $this->call(PurchaseSeeder::class);
         $this->call(AssetAssignmentSeeder::class);

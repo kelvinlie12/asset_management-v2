@@ -136,6 +136,18 @@ class ModuleCatalog
                 'teams.update',
             ],
         ],
+        'work_teams' => [
+            'label' => 'Team',
+            'group' => 'organization',
+            'menus' => ['Team Group'],
+            'description' => 'Master tim kerja (kelompok pengguna aset).',
+            'permissions' => [
+                'work_teams.view',
+                'work_teams.create',
+                'work_teams.update',
+                'work_teams.delete',
+            ],
+        ],
         'users' => [
             'label' => 'Pengguna',
             'group' => 'organization',
@@ -200,6 +212,7 @@ class ModuleCatalog
         'vehicles',
         'network',
         'teams',
+        'work_teams',
         'rooms',
         'users',
         'tasks',
