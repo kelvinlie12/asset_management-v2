@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\StorePurchaseRequest;
 use App\Http\Resources\PurchaseResource;
 use App\Models\Asset;
+use App\Models\Category;
 use App\Models\Purchase;
 use App\Support\ApiResponse;
 use App\Support\UnitScope;
@@ -68,8 +69,12 @@ class PurchaseController extends Controller
         $user = $request->user();
 
         $purchase = DB::transaction(function () use ($validated, $proofPath, $user) {
+            $categoryCode = ! empty($validated['category_id'])
+                ? Category::query()->whereKey($validated['category_id'])->value('code')
+                : null;
+
             $asset = Asset::create([
-                'asset_code' => $this->nextAssetCode(),
+                'asset_code' => Asset::generateAssetCode($categoryCode, $validated['purchase_date']),
                 'name' => $validated['name'],
                 'category_id' => $validated['category_id'] ?? null,
                 'room_id' => $validated['room_id'] ?? null,
@@ -129,20 +134,6 @@ class PurchaseController extends Controller
         $purchase->delete();
 
         return ApiResponse::noContent('Purchase record deleted successfully.');
-    }
-
-    /**
-     * Generate the next sequential asset code (e.g. AST-007).
-     */
-    private function nextAssetCode(): string
-    {
-        $max = (int) substr(Asset::query()->where('asset_code', 'like', 'AST-%')->max('asset_code') ?? '', 4);
-
-        do {
-            $code = 'AST-'.str_pad(++$max, 3, '0', STR_PAD_LEFT);
-        } while (Asset::query()->where('asset_code', $code)->exists());
-
-        return $code;
     }
 
     /**

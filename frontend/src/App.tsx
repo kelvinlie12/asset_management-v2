@@ -8,6 +8,7 @@ import Users from "./pages/Users";
 import Roles from "./pages/Roles";
 import Permissions from "./pages/Permissions";
 import Teams from "./pages/Teams";
+import Companies from "./pages/Companies";
 import Rooms from "./pages/Rooms";
 import Assets from "./pages/Assets";
 import Storage from "./pages/Storage";
@@ -60,6 +61,7 @@ export default function App() {
               <Route path="/roles" element={<Roles />} />
               <Route path="/permissions" element={<Permissions />} />
               <Route path="/teams" element={<Teams />} />
+              <Route path="/companies" element={<Companies />} />
               <Route path="/rooms" element={<Rooms />} />
               <Route path="/assets" element={<Assets />} />
               <Route path="/storage" element={<Storage />} />

@@ -8,6 +8,7 @@ use App\Http\Requests\UpdateAssetRequest;
 use App\Http\Resources\AssetResource;
 use App\Models\Asset;
 use App\Models\AssetDamage;
+use App\Models\Category;
 use App\Models\Purchase;
 use App\Models\Room;
 use App\Support\ApiResponse;
@@ -22,11 +23,32 @@ class AssetController extends Controller
 {
     /**
      * Generate a unique asset code.
+     *
+     * Format: KODE-BULAN-TAHUN-URUT (e.g. "ITE-10-2026-001"). The category and
+     * placement date come from the query string; without a category the legacy
+     * "AST-001" sequence is returned. The suggested next sequence is returned
+     * too, so the form can prefill the number the user may still edit.
      */
-    public function generateCode(): JsonResponse
+    public function generateCode(Request $request): JsonResponse
     {
+        $categoryId = $request->query('category_id');
+        $placementDate = $request->query('placement_date');
+
+        $categoryCode = null;
+        if ($categoryId) {
+            // Scoped to the user's own unit, so a code cannot be suggested from
+            // another company's category.
+            $categoryCode = UnitScope::apply(Category::query(), $request->user())
+                ->whereKey($categoryId)
+                ->value('code');
+        }
+
+        $sequence = Asset::nextAssetSequence($categoryCode, $placementDate);
+
         return ApiResponse::success([
-            'asset_code' => Asset::generateAssetCode(),
+            'asset_code' => Asset::buildAssetCode($categoryCode, $placementDate, $sequence),
+            'sequence' => $sequence,
+            'category_code' => $categoryCode,
         ], 'Asset code generated.');
     }
 

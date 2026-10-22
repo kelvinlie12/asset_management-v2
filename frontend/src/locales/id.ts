@@ -1081,4 +1081,43 @@ export const id: Record<string, string> = {
   "Select items": "Pilih item",
   "{count} selected": "{count} dipilih",
   "Select at least one item to export.": "Pilih minimal satu item untuk diexport.",
+
+  // Company (sebelumnya "Team" = unit/perusahaan)
+  "Company": "Company",
+  "Company Management": "Manajemen Company",
+  "Manage companies and their members.": "Kelola company dan anggotanya.",
+  "Add Company": "Tambah Company",
+  "Edit Company": "Ubah Company",
+  "Company Details": "Detail Company",
+  "Delete Company": "Hapus Company",
+  "No companies found.": "Tidak ada company ditemukan.",
+  "Create a new company.": "Buat company baru.",
+  "Create Company": "Buat Company",
+  "Company created.": "Company berhasil dibuat.",
+  "Company updated.": "Company berhasil diperbarui.",
+  "Company deleted.": "Company berhasil dihapus.",
+  "Failed to save company.": "Gagal menyimpan company.",
+  "Failed to delete company.": "Gagal menghapus company.",
+  "You do not have permission to view companies.":
+    "Anda tidak punya izin melihat company.",
+  "Company description": "Deskripsi company",
+  "Failed to load companies.": "Gagal memuat company.",
+  "All companies": "Semua company",
+  "No company (global)": "Tanpa company (global)",
+  "Rooms are added by the company itself on the Rooms page.":
+    "Ruangan ditambahkan oleh company sendiri di halaman Ruangan.",
+
+  // Team (kelompok kerja di dalam company)
+  "Manage teams inside each company.":
+    "Kelola team (kelompok kerja) di dalam setiap company.",
+  "Create a new team inside a company.":
+    "Buat team baru di dalam sebuah company.",
+  "e.g. Network Team": "mis. Tim Jaringan",
+
+  // Kode barang otomatis
+  "Item Number": "Nomor Barang",
+  "Auto: category code - month - year - item number.":
+    "Otomatis: kode kategori - bulan - tahun - nomor barang.",
+  "Fill in manually; the last part of the code.":
+    "Isi manual; bagian terakhir dari kode.",
 };

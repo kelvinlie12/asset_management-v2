@@ -25,6 +25,7 @@ import {
   fetchAssets,
   fetchAllAssets,
   fetchAssetCode,
+  buildAssetCode,
   createAsset,
   updateAsset,
   deleteAsset,
@@ -43,9 +44,11 @@ const PER_PAGE = 10;
 
 type FormState = {
   asset_code: string;
+  asset_sequence: string;
   name: string;
   category_id: string;
   team_id: string;
+  work_team_id: string;
   room_id: string;
   assigned_user_id: string;
   condition: string;
@@ -58,9 +61,11 @@ type FormState = {
 
 const EMPTY_FORM: FormState = {
   asset_code: "",
+  asset_sequence: "1",
   name: "",
   category_id: "",
   team_id: "",
+  work_team_id: "",
   room_id: "",
   assigned_user_id: "",
   condition: "USED",
@@ -200,6 +205,7 @@ export default function Assets() {
         name: form.name,
         category_id: form.category_id || null,
         team_id: form.team_id || null,
+        work_team_id: form.work_team_id || null,
         room_id: form.room_id || null,
         assigned_user_id:
           form.usage_status === "IN_USE" ? form.assigned_user_id || null : null,
@@ -283,10 +289,11 @@ export default function Assets() {
                 t("Asset"),
                 t("Code"),
                 t("Category"),
+                t("Company"),
+                t("Team"),
                 t("Condition"),
                 t("Usage Status"),
                 t("Location"),
-                t("Team"),
               ]}
               rows={async () => {
                 const all = await fetchAllAssets(filters);
@@ -294,13 +301,14 @@ export default function Assets() {
                   a.name,
                   a.asset_code,
                   a.category?.name ?? "",
+                  a.team?.name ?? "",
+                  a.work_team?.name ?? "",
                   conditionLabel(a.condition),
                   t(
                     USAGE_STATUS_OPTIONS.find((o) => o.value === a.usage_status)
                       ?.label ?? a.usage_status,
                   ),
                   a.room?.name ?? "",
-                  a.team?.name ?? "",
                 ]);
               }}
             />
@@ -376,6 +384,7 @@ export default function Assets() {
                 <TableRow>
                   <TableCell isHeader className={header}>{t("Asset")}</TableCell>
                   <TableCell isHeader className={header}>{t("Category")}</TableCell>
+                  <TableCell isHeader className={header}>{t("Team")}</TableCell>
                   <TableCell isHeader className={header}>{t("Condition")}</TableCell>
                   <TableCell isHeader className={header}>{t("Usage Status")}</TableCell>
                   <TableCell isHeader className={header}>{t("Location")}</TableCell>
@@ -385,14 +394,14 @@ export default function Assets() {
               <TableBody>
                 {loading && (
                   <TableRow>
-                    <TableCell colSpan={6} className="px-5 py-6 text-center text-sm text-gray-500">
+                    <TableCell colSpan={7} className="px-5 py-6 text-center text-sm text-gray-500">
                       {t("Loading...")}
                     </TableCell>
                   </TableRow>
                 )}
                 {!loading && assets.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={6} className="px-5 py-6 text-center text-sm text-gray-500">
+                    <TableCell colSpan={7} className="px-5 py-6 text-center text-sm text-gray-500">
                       {t("No assets found.")}
                     </TableCell>
                   </TableRow>
@@ -425,6 +434,9 @@ export default function Assets() {
                       </TableCell>
                       <TableCell className="px-5 py-4 text-sm text-gray-600 dark:text-gray-400">
                         {a.category?.name || "-"}
+                      </TableCell>
+                      <TableCell className="px-5 py-4 text-sm text-gray-600 dark:text-gray-400">
+                        {a.work_team?.name || "-"}
                       </TableCell>
                       <TableCell className="px-5 py-4">
                         <Badge size="sm" color={conditionColor(a.condition)}>
@@ -539,6 +551,8 @@ export default function Assets() {
               {[
                 [t("Code"), selected.asset_code],
                 [t("Category"), selected.category?.name || "-"],
+                [t("Company"), selected.team?.name || "-"],
+                [t("Team"), selected.work_team?.name || "-"],
                 [t("Condition"), conditionLabel(selected.condition)],
                 [t("Usage Status"), t(USAGE_STATUS_OPTIONS.find((o) => o.value === selected.usage_status)?.label ?? selected.usage_status)],
                 [t("Quantity"), String(selected.quantity)],
@@ -615,14 +629,22 @@ function AssetFormModal({
   const { user } = useAuth();
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
 
+  // Today, as the "yyyy-mm-dd" value the date input expects.
+  const today = new Date().toISOString().slice(0, 10);
+
   useEffect(() => {
     if (!isOpen) return;
     if (editing) {
+      // The stored code is kept as-is; its trailing number seeds the manual
+      // sequence field so an edit does not silently renumber the asset.
+      const tail = editing.asset_code?.split("-").pop() ?? "";
       setForm({
         asset_code: editing.asset_code,
+        asset_sequence: /^\d+$/.test(tail) ? String(Number(tail)) : "1",
         name: editing.name,
         category_id: editing.category?.id ? String(editing.category.id) : "",
         team_id: editing.team?.id ? String(editing.team.id) : "",
+        work_team_id: editing.work_team?.id ? String(editing.work_team.id) : "",
         room_id: editing.room?.id ? String(editing.room.id) : "",
         assigned_user_id: editing.assigned_user?.id ? String(editing.assigned_user.id) : "",
         condition: editing.condition === "GOOD" ? "USED" : editing.condition,
@@ -634,13 +656,14 @@ function AssetFormModal({
       });
       return;
     }
-    setForm({ ...EMPTY_FORM });
-    fetchAssetCode()
-      .then((res) => setForm((f) => ({ ...f, asset_code: res.data.asset_code })))
-      .catch(() => {
-        // the server assigns a code if none is sent
-      });
-  }, [isOpen, editing]);
+    // A new asset defaults to today's placement date, so the generated code
+    // already carries a real month/year before the user touches anything.
+    setForm({
+      ...EMPTY_FORM,
+      asset_code: buildAssetCode(null, today, 1),
+      placement_date: today,
+    });
+  }, [isOpen, editing, today]);
 
   function set<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -657,10 +680,46 @@ function AssetFormModal({
     (u) => !teamId || !u.team_id || String(u.team_id) === teamId,
   );
 
+  const selectedCategory = categories.find((c) => String(c.id) === form.category_id);
+  const categoryCode = selectedCategory?.code ?? null;
+
+  // Whenever the category or placement date changes, ask the server for the
+  // next free sequence and prefill it. The user can still type another number.
+  useEffect(() => {
+    if (!isOpen || editing) return;
+    let cancelled = false;
+    fetchAssetCode({
+      category_id: form.category_id || undefined,
+      placement_date: form.placement_date || undefined,
+    })
+      .then((res) => {
+        if (cancelled) return;
+        setForm((prev) => ({
+          ...prev,
+          asset_sequence: String(res.data.sequence),
+        }));
+      })
+      .catch(() => {
+        // Without a server reply the sequence stays as typed; the code below
+        // is still built from it.
+      });
+    return () => {
+      cancelled = true;
+    };
+    // Only re-run when the inputs that decide the prefix change.
+  }, [isOpen, editing, form.category_id, form.placement_date]);
+
+  // The code always reflects the chosen category, date and manual sequence.
+  const previewCode = editing
+    ? form.asset_code
+    : buildAssetCode(categoryCode, form.placement_date, Number(form.asset_sequence) || 1);
+
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!form.name.trim()) return;
-    onSubmit(form);
+    // On create the code is rebuilt from the category, date and sequence the
+    // user chose, so the submitted value always matches the preview.
+    onSubmit({ ...form, asset_code: previewCode });
   }
 
   const creating = !editing;
@@ -674,8 +733,26 @@ function AssetFormModal({
         <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <Label>{t("Code")}</Label>
-            <Input type="text" value={form.asset_code} disabled />
+            <Input type="text" value={previewCode} disabled />
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              {t("Auto: category code - month - year - item number.")}
+            </p>
           </div>
+          {creating && (
+            <div>
+              <Label>{t("Item Number")}</Label>
+              <Input
+                type="number"
+                min="1"
+                value={form.asset_sequence}
+                onChange={(e) => set("asset_sequence", e.target.value)}
+                placeholder="1"
+              />
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                {t("Fill in manually; the last part of the code.")}
+              </p>
+            </div>
+          )}
           <div>
             <Label>{t("Name")}</Label>
             <Input
@@ -719,7 +796,7 @@ function AssetFormModal({
 
           {!user?.team_id && (
             <div>
-              <Label>{t("Team")}</Label>
+              <Label>{t("Company")}</Label>
               <Select
                 options={[
                   { value: "", label: "-" },
@@ -730,6 +807,19 @@ function AssetFormModal({
               />
             </div>
           )}
+          <div>
+            <Label>{t("Team")}</Label>
+            <Select
+              options={[
+                { value: "", label: "-" },
+                ...(lookups?.work_teams ?? [])
+                  .filter((wt) => !teamId || !wt.team_id || String(wt.team_id) === teamId)
+                  .map((wt) => ({ value: String(wt.id), label: wt.name })),
+              ]}
+              defaultValue={form.work_team_id}
+              onChange={(v) => set("work_team_id", v)}
+            />
+          </div>
           <div>
             <Label>{t("Category")}</Label>
             <Select

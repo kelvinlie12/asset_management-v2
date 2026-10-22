@@ -3,10 +3,9 @@ import PageMeta from "../components/common/PageMeta";
 import ExportButton from "../components/common/ExportButton";
 import Input from "../components/form/input/InputField";
 import Label from "../components/form/Label";
-import FileInput from "../components/form/input/FileInput";
 import Select from "../components/form/Select";
-import Button from "../components/ui/button/Button";
 import Badge from "../components/ui/badge/Badge";
+import Button from "../components/ui/button/Button";
 import { Modal } from "../components/ui/modal";
 import { useModal } from "../hooks/useModal";
 import {
@@ -20,18 +19,18 @@ import { useAuth, hasPermission } from "../context/AuthContext";
 import { useLang } from "../context/LanguageContext";
 import { PlusIcon, PencilIcon, TrashBinIcon, EyeIcon, GroupIcon } from "../icons";
 import {
-  fetchTeams,
-  fetchAllTeams,
-  createTeam,
-  updateTeam,
-  deleteTeam,
+  fetchWorkTeams,
+  fetchAllWorkTeams,
+  fetchWorkTeam,
+  createWorkTeam,
+  updateWorkTeam,
+  deleteWorkTeam,
   STATUS_OPTIONS,
-  resolveTeamLogo,
-  type Team,
+  type WorkTeam,
   type Paginated,
-  type TeamFilters,
-  type TeamPayload,
-} from "../services/teams";
+  type WorkTeamFilters,
+} from "../services/workTeams";
+import { fetchTeams, type Team } from "../services/teams";
 import { useToast } from "../hooks/useToast";
 import { extractApiError as extractError } from "../utils/error";
 
@@ -41,35 +40,42 @@ type FormState = {
   name: string;
   description: string;
   status: string;
+  team_id: string;
 };
 
 const EMPTY_FORM: FormState = {
   name: "",
   description: "",
   status: "active",
+  team_id: "",
 };
 
 export default function Teams() {
   const { t } = useLang();
   const { user } = useAuth();
-  const canView = hasPermission(user, "teams.view");
-  const canCreate = hasPermission(user, "teams.create");
-  const canUpdate = hasPermission(user, "teams.update");
-  const canDelete = hasPermission(user, "teams.delete");
+  const canView = hasPermission(user, "work_teams.view");
+  const canCreate = hasPermission(user, "work_teams.create");
+  const canUpdate = hasPermission(user, "work_teams.update");
+  const canDelete = hasPermission(user, "work_teams.delete");
+  // Teams belong to one company, so only a super admin can switch between
+  // companies; everyone else is already pinned by the API.
+  const isSuperAdmin = user?.role === "super_admin";
 
-  const [teams, setTeams] = useState<Team[]>([]);
-  const [meta, setMeta] = useState<Paginated<Team>["meta"] | null>(null);
+  const [teams, setTeams] = useState<WorkTeam[]>([]);
+  const [meta, setMeta] = useState<Paginated<WorkTeam>["meta"] | null>(null);
   const [loading, setLoading] = useState(true);
+  const [companies, setCompanies] = useState<Team[]>([]);
   const { pushToast } = useToast();
 
-  const [filters, setFilters] = useState<TeamFilters>({
+  const [filters, setFilters] = useState<WorkTeamFilters>({
     search: "",
     status: "",
+    team_id: "",
     page: 1,
     per_page: PER_PAGE,
   });
 
-  const [selected, setSelected] = useState<Team | null>(null);
+  const [selected, setSelected] = useState<WorkTeam | null>(null);
 
   const addModal = useModal();
   const detailModal = useModal();
@@ -82,7 +88,7 @@ export default function Teams() {
   const loadTeams = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetchTeams(filters);
+      const res = await fetchWorkTeams(filters);
       setTeams(res.data.data);
       setMeta(res.data.meta);
     } catch (err) {
@@ -96,7 +102,15 @@ export default function Teams() {
     loadTeams();
   }, [loadTeams]);
 
-  function updateFilter(key: keyof TeamFilters, value: string) {
+  // Only the super admin needs the company list, for the filter dropdown.
+  useEffect(() => {
+    if (!isSuperAdmin) return;
+    fetchTeams({ per_page: 100 })
+      .then((res) => setCompanies(res.data.data))
+      .catch(() => setCompanies([]));
+  }, [isSuperAdmin]);
+
+  function updateFilter(key: keyof WorkTeamFilters, value: string) {
     setFilters((prev) => ({ ...prev, [key]: value, page: 1 }));
   }
 
@@ -116,27 +130,25 @@ export default function Teams() {
     name: string;
     description: string;
     status: string;
-    logo: File | null;
-    removeLogo: boolean;
-    editing: Team | null;
+    team_id: string;
+    editing: WorkTeam | null;
   }) {
     setSaving(true);
     try {
-      // No room_ids: rooms belong to one unit and are created by that unit
-      // on the rooms page.
-      const body: TeamPayload = {
+      const body: Record<string, unknown> = {
         name: payload.name,
         description: payload.description || null,
-        logo: payload.logo,
+        status: payload.status,
       };
+      // Only a super admin may pick the owning company; scoped users are pinned
+      // server-side, so sending their own team_id would be a no-op.
+      if (isSuperAdmin) body.team_id = payload.team_id ? Number(payload.team_id) : null;
       if (payload.editing) {
-        body.remove_logo = payload.removeLogo && !payload.logo;
-        await updateTeam(payload.editing.id, body);
+        await updateWorkTeam(payload.editing.id, body);
         showTempSuccess(t("Team updated."));
         editModal.closeModal();
       } else {
-        body.status = payload.status;
-        await createTeam(body);
+        await createWorkTeam(body);
         showTempSuccess(t("Team created."));
         addModal.closeModal();
       }
@@ -152,7 +164,7 @@ export default function Teams() {
     if (!selected) return;
     setSubmitting("delete");
     try {
-      await deleteTeam(selected.id);
+      await deleteWorkTeam(selected.id);
       deleteModal.closeModal();
       setSelected(null);
       showTempSuccess(t("Team deleted."));
@@ -184,9 +196,8 @@ export default function Teams() {
     <>
       <PageMeta
         title={t("Team Management")}
-        description={t("Manage teams and their members.")}
+        description={t("Manage teams inside each company.")}
       />
-      
 
       <div className="space-y-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -198,18 +209,18 @@ export default function Teams() {
               fileStem={t("Team Management")}
               headers={() => [
                 t("Team"),
+                t("Company"),
                 t("Description"),
-                t("Members"),
-                t("Rooms"),
+                t("Assets"),
                 t("Status"),
               ]}
               rows={async () => {
-                const all = await fetchAllTeams(filters);
+                const all = await fetchAllWorkTeams(filters);
                 return all.map((team) => [
                   team.name,
+                  team.team?.name ?? t("Global"),
                   team.description ?? "",
-                  team.users_count ?? 0,
-                  team.rooms_count ?? 0,
+                  team.assets_count ?? 0,
                   t(team.status),
                 ]);
               }}
@@ -232,6 +243,20 @@ export default function Teams() {
               className="lg:max-w-[300px]"
             />
             <div className="flex flex-col gap-3 sm:flex-row">
+              {isSuperAdmin && (
+                <Select
+                  options={[
+                    { value: "", label: t("All companies") },
+                    ...companies.map((company) => ({
+                      value: String(company.id),
+                      label: company.name,
+                    })),
+                  ]}
+                  placeholder={t("All companies")}
+                  defaultValue=""
+                  onChange={(v) => updateFilter("team_id", v)}
+                />
+              )}
               <Select
                 options={STATUS_OPTIONS}
                 placeholder={t("All statuses")}
@@ -249,10 +274,10 @@ export default function Teams() {
                     {t("Team")}
                   </TableCell>
                   <TableCell isHeader className="px-5 py-3 text-sm text-gray-500 dark:text-gray-400">
-                    {t("Members")}
+                    {t("Company")}
                   </TableCell>
                   <TableCell isHeader className="px-5 py-3 text-sm text-gray-500 dark:text-gray-400">
-                    {t("Rooms")}
+                    {t("Assets")}
                   </TableCell>
                   <TableCell isHeader className="px-5 py-3 text-sm text-gray-500 dark:text-gray-400">
                     {t("Status")}
@@ -282,17 +307,9 @@ export default function Teams() {
                     <TableRow key={team.id}>
                       <TableCell className="px-5 py-4">
                         <div className="flex items-center gap-3">
-                          {resolveTeamLogo(team) ? (
-                            <img
-                              src={resolveTeamLogo(team)!}
-                              alt={team.name}
-                              className="h-10 w-10 shrink-0 rounded-full border border-gray-200 bg-white object-contain dark:border-white/10"
-                            />
-                          ) : (
-                            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-50 text-brand-500 dark:bg-brand-500/15 dark:text-brand-400">
-                              <GroupIcon />
-                            </span>
-                          )}
+                          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-50 text-brand-500 dark:bg-brand-500/15 dark:text-brand-400">
+                            <GroupIcon />
+                          </span>
                           <div>
                             <p className="text-sm font-medium text-gray-800 dark:text-white/90">
                               {team.name}
@@ -304,10 +321,10 @@ export default function Teams() {
                         </div>
                       </TableCell>
                       <TableCell className="px-5 py-4 text-sm text-gray-600 dark:text-gray-400">
-                        {team.users_count ?? 0}
+                        {team.team?.name ?? t("Global")}
                       </TableCell>
                       <TableCell className="px-5 py-4 text-sm text-gray-600 dark:text-gray-400">
-                        {team.rooms_count ?? 0}
+                        {team.assets_count ?? 0}
                       </TableCell>
                       <TableCell className="px-5 py-4">
                         <Badge
@@ -474,55 +491,42 @@ function TeamModal({
 }: {
   isOpen: boolean;
   onClose: () => void;
-  editing: Team | null;
+  editing: WorkTeam | null;
   saving: boolean;
   onSubmit: (payload: {
     name: string;
     description: string;
     status: string;
-    logo: File | null;
-    removeLogo: boolean;
-    editing: Team | null;
+    team_id: string;
+    editing: WorkTeam | null;
   }) => void;
 }) {
   const { t } = useLang();
-  const [logoFile, setLogoFile] = useState<File | null>(null);
-  const [removeLogo, setRemoveLogo] = useState(false);
-  const [logoPreview, setLogoPreview] = useState<string | null>(null);
-  const [form, setForm] = useState<FormState>(() =>
-    editing
-      ? {
-          name: editing.name,
-          description: editing.description || "",
-          status: editing.status,
-        }
-      : EMPTY_FORM
-  );
+  const { user } = useAuth();
+  const isSuperAdmin = user?.role === "super_admin";
+  const [companies, setCompanies] = useState<Team[]>([]);
 
-  // Preview of the file the user just picked.
+  const buildForm = (team: WorkTeam | null): FormState =>
+    team
+      ? {
+          name: team.name,
+          description: team.description || "",
+          status: team.status,
+          team_id: team.team_id ? String(team.team_id) : "",
+        }
+      : EMPTY_FORM;
+  const [form, setForm] = useState<FormState>(() => buildForm(editing));
+
   useEffect(() => {
-    if (!logoFile) {
-      setLogoPreview(null);
-      return;
-    }
-    const url = URL.createObjectURL(logoFile);
-    setLogoPreview(url);
-    return () => URL.revokeObjectURL(url);
-  }, [logoFile]);
+    if (!isOpen || !isSuperAdmin) return;
+    fetchTeams({ per_page: 100 })
+      .then((res) => setCompanies(res.data.data))
+      .catch(() => setCompanies([]));
+  }, [isOpen, isSuperAdmin]);
 
   useEffect(() => {
     if (isOpen) {
-      setLogoFile(null);
-      setRemoveLogo(false);
-      setForm(
-        editing
-          ? {
-              name: editing.name,
-              description: editing.description || "",
-              status: editing.status,
-            }
-          : EMPTY_FORM
-      );
+      setForm(buildForm(editing));
     }
   }, [isOpen, editing]);
 
@@ -533,25 +537,19 @@ function TeamModal({
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!form.name.trim()) return;
-    onSubmit({
-      ...form,
-      name: form.name.trim(),
-      logo: logoFile,
-      removeLogo,
-      editing,
-    });
+    onSubmit({ ...form, name: form.name.trim(), editing });
   }
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} className="max-w-[550px] m-4">
-      <div className="no-scrollbar relative w-full max-w-[550px] overflow-y-auto rounded-3xl bg-white p-6 dark:bg-gray-900">
+    <Modal isOpen={isOpen} onClose={onClose} className="max-w-[500px] m-4">
+      <div className="no-scrollbar relative w-full max-w-[500px] overflow-y-auto rounded-3xl bg-white p-6 dark:bg-gray-900">
         <h4 className="text-2xl font-semibold text-gray-800 dark:text-white/90">
           {editing ? t("Edit Team") : t("Add Team")}
         </h4>
         <p className="mb-6 mt-1 text-sm text-gray-500 dark:text-gray-400">
           {editing
             ? t("Update details for {name}.", { name: editing.name })
-            : t("Create a new team.")}
+            : t("Create a new team inside a company.")}
         </p>
         <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
@@ -560,7 +558,7 @@ function TeamModal({
               type="text"
               value={form.name}
               onChange={(e) => set("name", e.target.value)}
-              placeholder={t("e.g. Development")}
+              placeholder={t("e.g. Network Team")}
               required
             />
           </div>
@@ -573,6 +571,20 @@ function TeamModal({
               onChange={(v) => set("status", v)}
             />
           </div>
+          {isSuperAdmin && (
+            <div className="sm:col-span-2">
+              <Label>{t("Company")}</Label>
+              <Select
+                options={companies.map((company) => ({
+                  value: String(company.id),
+                  label: company.name,
+                }))}
+                placeholder={t("No company (global)")}
+                defaultValue={form.team_id}
+                onChange={(v) => set("team_id", v)}
+              />
+            </div>
+          )}
           <div className="sm:col-span-2">
             <Label>{t("Description")}</Label>
             <Input
@@ -582,51 +594,6 @@ function TeamModal({
               placeholder={t("Team description")}
             />
           </div>
-          <div className="sm:col-span-2">
-            <Label>{t("Team Logo")}</Label>
-            <div className="flex items-center gap-4">
-              {(() => {
-                const current = removeLogo ? null : resolveTeamLogo(editing);
-                const src = logoPreview ?? current;
-                return src ? (
-                  <img
-                    src={src}
-                    alt={t("Team Logo")}
-                    className="h-16 w-16 shrink-0 rounded-xl border border-gray-200 bg-white object-contain dark:border-white/10"
-                  />
-                ) : (
-                  <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-500 dark:bg-brand-500/15 dark:text-brand-400">
-                    <GroupIcon />
-                  </span>
-                );
-              })()}
-              <div className="min-w-0 flex-1">
-                <FileInput
-                  className="custom-class"
-                  onChange={(e) => {
-                    setLogoFile(e.target.files?.[0] ?? null);
-                    setRemoveLogo(false);
-                  }}
-                />
-                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  {t("PNG, JPG, WEBP or GIF, max 4 MB. Shown in the sidebar.")}
-                </p>
-                {editing?.logo && !logoFile && (
-                  <label className="mt-2 inline-flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
-                    <input
-                      type="checkbox"
-                      checked={removeLogo}
-                      onChange={(e) => setRemoveLogo(e.target.checked)}
-                    />
-                    {t("Remove current logo")}
-                  </label>
-                )}
-              </div>
-            </div>
-          </div>
-          <p className="text-xs text-gray-500 sm:col-span-2 dark:text-gray-400">
-            {t("Rooms are added by the team itself on the Rooms page.")}
-          </p>
           <div className="sm:col-span-2 mt-2 flex items-center gap-3 justify-end">
             <Button size="sm" variant="outline" onClick={onClose}>
               {t("Cancel")}
@@ -653,11 +620,22 @@ function DetailModal({
 }: {
   isOpen: boolean;
   onClose: () => void;
-  team: Team | null;
+  team: WorkTeam | null;
   onEdit?: () => void;
 }) {
   const { t } = useLang();
-  if (!team) return null;
+  const [loaded, setLoaded] = useState<WorkTeam | null>(team);
+
+  useEffect(() => {
+    if (isOpen && team) {
+      setLoaded(team);
+      fetchWorkTeam(team.id)
+        .then((res) => setLoaded(res.data.work_team))
+        .catch(() => undefined);
+    }
+  }, [isOpen, team]);
+
+  if (!team || !loaded) return null;
   return (
     <Modal isOpen={isOpen} onClose={onClose} className="max-w-[500px] m-4">
       <div className="no-scrollbar max-h-[85vh] w-full max-w-[500px] overflow-y-auto rounded-3xl bg-white p-6 dark:bg-gray-900">
@@ -666,9 +644,8 @@ function DetailModal({
         </h4>
         <div className="mt-4">
           <p className="text-lg font-semibold text-gray-800 dark:text-white/90">
-            {team.name}
+            {loaded.name}
           </p>
-          <p className="text-sm text-gray-500 dark:text-gray-400">{team.slug}</p>
         </div>
         <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
@@ -676,27 +653,27 @@ function DetailModal({
             <Badge
               size="sm"
               variant="light"
-              color={team.status === "active" ? "success" : "error"}
+              color={loaded.status === "active" ? "success" : "error"}
             >
-              {team.status}
+              {loaded.status}
             </Badge>
           </div>
           <div>
-            <Label>{t("Members")}</Label>
+            <Label>{t("Company")}</Label>
             <p className="text-sm text-gray-800 dark:text-white/90">
-              {team.users_count ?? 0}
+              {loaded.team ? loaded.team.name : t("Global")}
+            </p>
+          </div>
+          <div>
+            <Label>{t("Assets")}</Label>
+            <p className="text-sm text-gray-800 dark:text-white/90">
+              {loaded.assets_count ?? 0}
             </p>
           </div>
           <div className="sm:col-span-2">
             <Label>{t("Description")}</Label>
             <p className="text-sm text-gray-800 dark:text-white/90">
-              {team.description || "-"}
-            </p>
-          </div>
-          <div>
-            <Label>{t("Rooms")}</Label>
-            <p className="text-sm text-gray-800 dark:text-white/90">
-              {team.rooms_count ?? 0}
+              {loaded.description || "-"}
             </p>
           </div>
         </div>

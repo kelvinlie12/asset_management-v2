@@ -4,6 +4,7 @@ import type { Category } from "./categories";
 import type { Room } from "./rooms";
 import type { Team } from "./teams";
 import type { User } from "./users";
+import type { WorkTeam } from "./workTeams";
 
 export interface Lookups {
   categories: Pick<Category, "id" | "name" | "code" | "team_id">[];
@@ -11,6 +12,7 @@ export interface Lookups {
   teams: Pick<Team, "id" | "name" | "slug">[];
   users: Pick<User, "id" | "name" | "role" | "team_id">[];
   assets: Pick<Asset, "id" | "name" | "asset_code">[];
+  work_teams: Pick<WorkTeam, "id" | "name" | "team_id">[];
 }
 
 /**

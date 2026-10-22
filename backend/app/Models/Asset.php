@@ -75,22 +75,94 @@ class Asset extends Model
     }
 
     /**
-     * Generate a unique asset code (AST-001, AST-002, ...).
+     * Build an asset code in the format KODE-BULAN-TAHUN-URUT.
+     *
+     * Example: "ITE-10-2026-001" — the category code, the month and year of
+     * placement, then the sequence of the item inside that category/month.
+     *
+     * @param  string|null  $categoryCode  Category code; falls back to "AST".
+     * @param  \DateTimeInterface|string|null  $placementDate  Source of month/year.
+     * @param  int  $sequence  The item's number within the month (1 = 001).
      */
-    public static function generateAssetCode(): string
-    {
+    public static function buildAssetCode(
+        ?string $categoryCode,
+        \DateTimeInterface|string|null $placementDate,
+        int $sequence,
+    ): string {
+        $prefix = $categoryCode ? strtoupper(trim($categoryCode)) : 'AST';
+
+        $date = $placementDate instanceof \DateTimeInterface
+            ? $placementDate
+            : ($placementDate ? new \DateTimeImmutable((string) $placementDate) : new \DateTimeImmutable);
+
+        $month = $date->format('m');
+        $year = $date->format('Y');
+        $number = str_pad((string) max($sequence, 1), 3, '0', STR_PAD_LEFT);
+
+        return "{$prefix}-{$month}-{$year}-{$number}";
+    }
+
+    /**
+     * Next sequence number for a category/month, i.e. how many assets already
+     * carry a code starting with "{prefix}-{MM}-{YYYY}-".
+     */
+    public static function nextAssetSequence(
+        ?string $categoryCode,
+        \DateTimeInterface|string|null $placementDate,
+    ): int {
+        $prefix = $categoryCode ? strtoupper(trim($categoryCode)) : 'AST';
+
+        $date = $placementDate instanceof \DateTimeInterface
+            ? $placementDate
+            : ($placementDate ? new \DateTimeImmutable((string) $placementDate) : new \DateTimeImmutable);
+
+        $stem = "{$prefix}-{$date->format('m')}-{$date->format('Y')}-";
+
         $max = static::query()
-            ->where('asset_code', 'like', 'AST-%')
+            ->where('asset_code', 'like', "{$stem}%")
             ->pluck('asset_code')
-            ->reduce(function (int $carry, string $code): int {
-                if (preg_match('/^AST-(\d+)$/i', $code, $m)) {
-                    return max($carry, (int) $m[1]);
+            ->reduce(function (int $carry, string $code) use ($stem): int {
+                $tail = substr($code, strlen($stem));
+                if (ctype_digit($tail)) {
+                    return max($carry, (int) $tail);
                 }
 
                 return $carry;
             }, 0);
 
-        return 'AST-' . str_pad((string) ($max + 1), 3, '0', STR_PAD_LEFT);
+        return $max + 1;
+    }
+
+    /**
+     * Generate the next sequential asset code for a category/date.
+     *
+     * Falls back to the legacy "AST-001" format when no category is given, so
+     * callers that only need a placeholder still receive a unique code.
+     */
+    public static function generateAssetCode(
+        ?string $categoryCode = null,
+        \DateTimeInterface|string|null $placementDate = null,
+    ): string {
+        if (! $categoryCode) {
+            $max = static::query()
+                ->where('asset_code', 'like', 'AST-%')
+                ->pluck('asset_code')
+                ->reduce(function (int $carry, string $code): int {
+                    if (preg_match('/^AST-(\d+)$/i', $code, $m)) {
+                        return max($carry, (int) $m[1]);
+                    }
+
+                    return $carry;
+                }, 0);
+
+            return 'AST-' . str_pad((string) ($max + 1), 3, '0', STR_PAD_LEFT);
+        }
+
+        return static::buildAssetCode(
+            $categoryCode,
+            $placementDate,
+            static::nextAssetSequence($categoryCode, $placementDate),
+        );
     }
 
     /**
