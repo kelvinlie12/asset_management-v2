@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router";
 import PageMeta from "../components/common/PageMeta";
 import ExportButton from "../components/common/ExportButton";
+import AssetWordExportModal from "../components/assets/AssetWordExportModal";
 import Input from "../components/form/input/InputField";
 import TextArea from "../components/form/input/TextArea";
 import Label from "../components/form/Label";
@@ -19,7 +20,7 @@ import {
 } from "../components/ui/table";
 import { useAuth, hasPermission } from "../context/AuthContext";
 import { useLang } from "../context/LanguageContext";
-import { PlusIcon, EyeIcon, PencilIcon, TrashBinIcon } from "../icons";
+import { PlusIcon, EyeIcon, PencilIcon, TrashBinIcon, DocsIcon } from "../icons";
 import {
   fetchAssets,
   fetchAllAssets,
@@ -303,6 +304,14 @@ export default function Assets() {
                 ]);
               }}
             />
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={wordModal.openModal}
+              startIcon={<DocsIcon className="h-4 w-4" />}
+            >
+              {t("Export Word")}
+            </Button>
             {canCreate && (
               <Button
                 onClick={() => {
@@ -576,6 +585,13 @@ export default function Assets() {
           </div>
         </Modal>
       )}
+
+      <AssetWordExportModal
+        isOpen={wordModal.isOpen}
+        onClose={wordModal.closeModal}
+        loadAssets={fetchAllAssets}
+        filters={filters}
+      />
     </>
   );
 }

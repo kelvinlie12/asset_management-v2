@@ -1072,4 +1072,13 @@ export const id: Record<string, string> = {
   "Export Excel": "Export Excel",
   "Menyiapkan…": "Menyiapkan…",
   "Failed to export data.": "Gagal mengekspor data.",
+
+  // Ekspor Word
+  "Export Word": "Export Word",
+  "Choose which asset codes to include in the Word document.":
+    "Pilih kode barang yang akan dimasukkan ke dokumen Word.",
+  "All items": "Semua item",
+  "Select items": "Pilih item",
+  "{count} selected": "{count} dipilih",
+  "Select at least one item to export.": "Pilih minimal satu item untuk diexport.",
 };
