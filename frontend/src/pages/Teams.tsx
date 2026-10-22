@@ -29,6 +29,7 @@ import {
   type WorkTeam,
   type Paginated,
   type WorkTeamFilters,
+  type WorkTeamPayload,
 } from "../services/workTeams";
 import { fetchTeams, type Team } from "../services/teams";
 import { useToast } from "../hooks/useToast";
@@ -135,7 +136,7 @@ export default function Teams() {
   }) {
     setSaving(true);
     try {
-      const body: Record<string, unknown> = {
+      const body: WorkTeamPayload = {
         name: payload.name,
         description: payload.description || null,
         status: payload.status,
